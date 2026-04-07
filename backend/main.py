@@ -1,5 +1,9 @@
+# from fastapi import FastAPI, UploadFile, File, HTTPException
+# import fitz  # PyMuPDF
+# import io
+
 from fastapi import FastAPI, UploadFile, File, HTTPException
-import fitz  # PyMuPDF
+import fitz
 import io
 
 app = FastAPI()
