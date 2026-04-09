@@ -112,6 +112,7 @@ async def analyze_resume(
         # 2. AI Logic (Groq)
         try:
             completion = client.chat.completions.create(
+                
                 model="llama-3.3-70b-versatileqqq",
                 messages=[
                     {"role": "system", "content": "You are a recruitment expert. Compare the resume to the JD. Return ONLY a JSON object with keys: 'match_score', 'missing_keywords', and 'tips'."},
