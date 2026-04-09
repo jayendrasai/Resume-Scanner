@@ -4,3 +4,6 @@ python-multipart
 pymupdf
 openai
 python-dotenv
+groq
+slowapi
+requests
