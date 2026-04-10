@@ -6,6 +6,7 @@ from fastapi import FastAPI, UploadFile, File,Form ,  HTTPException , Request
 import fitz
 import io
 import os
+import json
 from groq import Groq
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -78,14 +79,14 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=["http://localhost:5173"],  # Allows all origins
     #allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods (GET, POST, PUT, DELETE, etc.)
+    allow_methods=["POST"],  # Allows all methods (GET, POST, PUT, DELETE, etc.)
     allow_headers=["*"],  # Allows all headers
 )
 
 @app.post("/analyze")
-@limiter.limit("5/minute")
+@limiter.limit("3/minute")
 async def analyze_resume(
     request: Request,
     file: UploadFile = File(...), 
@@ -104,6 +105,7 @@ async def analyze_resume(
             resume_text += page.get_text()
 
         # 3. Validation of content
+        #sda
         if not resume_text.strip():
             raise HTTPException(status_code=400, detail="Could not extract text from PDF.")
         
@@ -121,7 +123,7 @@ async def analyze_resume(
                 response_format={"type": "json_object"}
             )
             print("Text from groq: ",completion.choices[0].message.content)
-            return completion.choices[0].message.content
+            return json.loads(completion.choices[0].message.content)
 
         except Exception as e:
             print("Groq failed → switching to HuggingFace")

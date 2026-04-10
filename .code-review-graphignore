@@ -1,0 +1,14 @@
+# Build & Environment
+**/node_modules/
+**/venv/
+**/.venv/
+**/__pycache__/
+*.pyc
+
+# Project Specific
+chroma_db/
+storage/
+dist/
+.agents/
+
+
