@@ -2,7 +2,7 @@
 # import fitz  # PyMuPDF
 # import io
 
-from fastapi import FastAPI, UploadFile, File,Form ,  HTTPException , Request
+from fastapi import FastAPI, UploadFile, File,Form ,  HTTPException , Request , Depends
 import fitz
 import io
 import os
@@ -14,6 +14,11 @@ from slowapi.errors import RateLimitExceeded
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 import requests
+
+
+from middleware import verify_guest_id
+from history_manager import log_activity, get_user_scan_count , get_history
+
 
 load_dotenv()
 #load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
@@ -81,7 +86,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],  # Allows all origins
     allow_credentials=True,
-    allow_methods=["POST"],  # Allows all methods (GET, POST, PUT, DELETE, etc.)
+    allow_methods=["POST" , "GET"],  # Allows all methods (GET, POST, PUT, DELETE, etc.)
     allow_headers=["Content-Type"],  # Allows all headers
 )
 
@@ -90,8 +95,12 @@ app.add_middleware(
 async def analyze_resume(
     request: Request,
     file: UploadFile = File(...), 
-    job_description: str = Form(...)
+    job_description: str = Form(...),
+    guest_id: str = Depends(verify_guest_id)
 ):
+
+    log_activity(guest_id, file.filename)
+
     # 1. Validation
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files are accepted.")
@@ -171,6 +180,17 @@ async def extract_text(file: UploadFile = File(...)):
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
+
+
+@app.get("/history")
+async def get_my_history(guest_id: str = Depends(verify_guest_id)):
+
+    all_history = get_history()
+    # Filter only for THIS user
+    user_history = [h for h in all_history if h['guest_id'] == guest_id]
+    return user_history
+
+
 
 if __name__ == "__main__":
     import uvicorn

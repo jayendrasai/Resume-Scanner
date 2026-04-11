@@ -61,3 +61,6 @@ dist/
 .idea
 .DS_Store
 
+# --- Identity & History ---
+# Ignore the local JSON activity log
+history.json

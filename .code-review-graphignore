@@ -14,3 +14,5 @@ dist/
 .agents/
 .claude/
 
+history.json
+.env
