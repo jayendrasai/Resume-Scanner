@@ -39,7 +39,7 @@ const ResumeScanner: React.FC = () => {
             setStatus("done");
         } catch (err: any) {
             const msg = err.response?.status === 429
-                ? "Rate limit reached — try again in a minute."
+                ? "Rate limit reached — try again after 3 hours."
                 : err.message;
             setErrorMsg(msg);
             setStatus("error");

@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import requests
 
 
-from middleware import verify_guest_id
+#from middleware import verify_guest_id
 from history_manager import log_activity, get_user_scan_count , get_history
 
 
@@ -97,10 +97,33 @@ async def analyze_resume(
     request: Request,
     file: UploadFile = File(...), 
     job_description: str = Form(...),
-    guest_id: str = Depends(verify_guest_id)
+    #guest_id: str = Depends(verify_guest_id)
 ):
+    # --------for docker --------
+    # guest_id = request.headers.get("X-Guest-ID")
 
-    log_activity(guest_id, file.filename)
+    # ip = request.headers.get(
+    #     "x-forwarded-for",
+    #     request.client.host
+    # )
+    # print("Guest:", guest_id)
+    # print("IP:", ip)
+
+
+
+    # --------for local --------
+    guest_id = request.headers.get("X-Guest-ID")
+    ip = request.client.host
+
+    count = get_user_scan_count(guest_id, ip)
+
+    if count >= 3:
+        raise HTTPException(
+            status_code=429,
+            detail="Limit reached. Try again after 3 hours."
+        )
+
+    log_activity(guest_id, ip, file.filename)
 
     # 1. Validation
     if not file.filename.endswith('.pdf'):
@@ -184,7 +207,8 @@ async def extract_text(file: UploadFile = File(...)):
 
 
 @app.get("/history")
-async def get_my_history(guest_id: str = Depends(verify_guest_id)):
+async def get_my_history(request: Request):
+    guest_id = request.headers.get("X-Guest-ID")
 
     all_history = get_history()
     # Filter only for THIS user
