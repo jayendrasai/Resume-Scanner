@@ -1,7 +1,9 @@
+
 # Build & Environment
+node_modules/
 **/node_modules/
-**/venv/
-**/.venv/
+venv/
+.venv/
 **/__pycache__/
 *.pyc
 
@@ -10,5 +12,5 @@ chroma_db/
 storage/
 dist/
 .agents/
-
+.claude/
 

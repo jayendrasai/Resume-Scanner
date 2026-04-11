@@ -1,4 +1,4 @@
-import { useState } from 'react'
+
 import ResumeScanner from './components/ResumeScanner.tsx'
 import './App.css'
 
