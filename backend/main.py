@@ -87,7 +87,8 @@ app.add_middleware(
     allow_origins=["http://localhost:5173"],  # Allows all origins
     allow_credentials=True,
     allow_methods=["POST" , "GET"],  # Allows all methods (GET, POST, PUT, DELETE, etc.)
-    allow_headers=["Content-Type"],  # Allows all headers
+    #allow_headers=["*"],  # Allows all headers
+    allow_headers=["Content-Type", "X-Guest-ID"]
 )
 
 @app.post("/analyze")

@@ -13,7 +13,17 @@ const Chip: React.FC<ChipProps> = ({ label, variant = "default" }) => {
     };
     const c = colors[variant];
     return (
-        <span style={{ /* ... use your existing inline styles here ... */ }}>
+        <span style={{
+            backgroundColor: c.bg,
+            border: `1px solid ${c.border}`,
+            color: c.text,
+            padding: "0.25rem 0.75rem",
+            borderRadius: "9999px",
+            fontSize: "0.75rem",
+            fontWeight: 500,
+            display: "inline-flex",
+            alignItems: "center"
+        }}>
             {label}
         </span>
     );
