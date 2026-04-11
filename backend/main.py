@@ -31,58 +31,58 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
-# def call_huggingface(prompt):
-#     API_URL = "https://router.huggingface.co/v1/chat/completions"
+def call_huggingface(prompt):
+    API_URL = "https://router.huggingface.co/v1/chat/completions"
 
-#     headers = {
-#         "Authorization": f"Bearer {HF_API_KEY}",
-#         "Content-Type": "application/json"
-#     }
+    headers = {
+        "Authorization": f"Bearer {HF_API_KEY}",
+        "Content-Type": "application/json"
+    }
 
-#     payload = {
-#         "model": "mistralai/Mixtral-8x7B-Instruct-v0.1",
-#         "messages": [
-#             {
-#                 "role": "system",
-#                 "content": "You are a recruitment expert. Return ONLY JSON with keys: match_score, missing_keywords, tips"
-#             },
-#             {
-#                 "role": "user",
-#                 "content": prompt
-#             }
-#         ],
-#         "max_tokens": 500,
-#         "temperature": 0.2
-#     }
+    payload = {
+        "model": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are a recruitment expert. Return ONLY JSON with keys: match_score, missing_keywords, tips"
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        "max_tokens": 500,
+        "temperature": 0.2
+    }
 
-#     response = requests.post(API_URL, headers=headers, json=payload)
+    response = requests.post(API_URL, headers=headers, json=payload)
 
-#     data = response.json()
-#     print("HF RAW RESPONSE:", data)
+    data = response.json()
+    print("HF RAW RESPONSE:", data)
 
-#     # Safe extraction
-#     if "choices" in data:
-#         return data["choices"][0]["message"]["content"]
+    # Safe extraction
+    if "choices" in data:
+        return data["choices"][0]["message"]["content"]
 
-#     # fallback format
-#     if "generated_text" in data:
-#         return data["generated_text"]
+    # fallback format
+    if "generated_text" in data:
+        return data["generated_text"]
 
-#     # fallback list format
-#     if isinstance(data, list):
-#         return data[0].get("generated_text", str(data))
+    # fallback list format
+    if isinstance(data, list):
+        return data[0].get("generated_text", str(data))
 
-#     return str(data)
-#     data = response.json()
+    return str(data)
+    data = response.json()
 
-#     #return data["choices"][0]["message"]["content"]
+    return data["choices"][0]["message"]["content"]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],  # Allows all origins
-    #allow_credentials=True,
+    allow_credentials=True,
     allow_methods=["POST"],  # Allows all methods (GET, POST, PUT, DELETE, etc.)
-    allow_headers=["*"],  # Allows all headers
+    allow_headers=["Content-Type"],  # Allows all headers
 )
 
 @app.post("/analyze")
@@ -115,9 +115,9 @@ async def analyze_resume(
         try:
             completion = client.chat.completions.create(
                 
-                model="llama-3.3-70b-versatileqqq",
+                model="llama-3.3-70b-versatile",
                 messages=[
-                    {"role": "system", "content": "You are a recruitment expert. Compare the resume to the JD. Return ONLY a JSON object with keys: 'match_score', 'missing_keywords', and 'tips'."},
+                    {"role": "system", "content": "You are a recruitment expert. Compare the resume to the JD. Return ONLY a JSON object with keys: 'match_score', 'missing_keywords', and 'tips must atleast 5'."},
                     {"role": "user", "content": f"JD: {job_description}\n\nResume: {resume_text}"}
                 ],
                 response_format={"type": "json_object"}
@@ -147,7 +147,7 @@ async def analyze_resume(
 
             hf_response = call_huggingface(prompt)
             print("Text from huggingface: ",hf_response)
-            return hf_response
+            return json.loads(hf_response)
 
     except Exception as e:
         return {"status": "error", "message": str(e)}
