@@ -3,6 +3,7 @@ from history_manager import get_user_scan_count
 
 async def verify_guest_id(request: Request):
     guest_id = request.headers.get("X-Guest-ID")
+    ip = request.client.host
     
     if not guest_id:
         raise HTTPException(
@@ -11,7 +12,7 @@ async def verify_guest_id(request: Request):
         )
     
     # Optional: Rate Limiting (e.g., max 10 scans per guest)
-    scan_count = get_user_scan_count(guest_id)
+    scan_count = get_user_scan_count(guest_id, ip)
     if scan_count >= 3:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
