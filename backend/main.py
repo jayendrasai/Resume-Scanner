@@ -146,11 +146,32 @@ async def analyze_resume(
         # --- Placeholder for Day 2: OpenAI Logic ---
         # 2. AI Logic (Groq)
         try:
+            # Updated System Prompt
+            system_prompt = """
+                    You are a Senior Technical Recruiter and ATS Optimization Expert. 
+                    Your task is to conduct a high-fidelity GAP analysis between a Job Description (JD) and a Resume.
+
+                    CRITICAL INSTRUCTIONS:
+                    1. SCORING RUBRIC: Calculate a single overall match score from 0 to 100. Weigh your calculation based on:
+                    - Hard Skills (50%): Tech stack, tools, platforms.
+                    - Experience (30%): Relevance of past roles.
+                    - Soft Skills/Education (20%): Leadership, degrees.
+                    2. MISSING KEYWORDS: Identify specific technical terms present in the JD but missing from the resume.
+                    3. TIPS: Provide exactly 5 actionable suggestions. These MUST be plain text strings. Do NOT use nested objects for tips.
+                    4. FORMAT: Return ONLY a valid JSON object exactly matching the schema below.
+
+                    EXPECTED JSON SCHEMA:
+                    {
+                    "match_score": <integer between 0 and 100>,
+                    "missing_keywords": ["keyword1", "keyword2", "keyword3"],
+                    "tips": ["string1", "string2", "string3", "string4", "string5"]
+                    }
+                """
             completion = client.chat.completions.create(
                 
                 model="llama-3.3-70b-versatile",
                 messages=[
-                    {"role": "system", "content": "You are a recruitment expert. Compare the resume to the JD. Return ONLY a JSON object with keys: 'match_score', 'missing_keywords', and 'tips must atleast 5'."},
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": f"JD: {job_description}\n\nResume: {resume_text}"}
                 ],
                 response_format={"type": "json_object"}

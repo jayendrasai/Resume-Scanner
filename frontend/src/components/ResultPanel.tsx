@@ -22,6 +22,7 @@ const ResultPanel: React.FC<ResultPanelProps> = ({ data }) => {
                 borderBottom: "1px solid var(--border)",
             }}>
                 <ScoreRing score={match_score} />
+                {/* <ScoreRing score={Math.round(match_score * 100)} /> */}
                 <div>
                     <div style={{ fontFamily: "var(--font-head)", fontSize: 22, fontWeight: 700, marginBottom: 6 }}>
                         Resume Analysis Complete

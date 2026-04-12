@@ -25,7 +25,7 @@ const ScoreRing: React.FC<{ score: number }> = ({ score }) => {
                 position: "absolute", inset: 0,
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center"
             }}>
-                <span style={{ fontFamily: "var(--font-head)", fontSize: 28, fontWeight: 800, color, lineHeight: 1 }}>{score}</span>
+                <span style={{ fontFamily: "var(--font-head)", fontSize: 26, fontWeight: 700, color, lineHeight: 1 }}>{score}%</span>
                 <span style={{ fontSize: 10, color: "var(--muted)", letterSpacing: "0.12em", marginTop: 2 }}>MATCH</span>
             </div>
         </div>
