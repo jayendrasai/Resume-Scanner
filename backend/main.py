@@ -14,6 +14,7 @@ from slowapi.errors import RateLimitExceeded
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 import requests
+from openai import OpenAI
 
 
 #from middleware import verify_guest_id
@@ -25,9 +26,13 @@ load_dotenv()
 # Initialize Groq Client
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-HF_API_KEY = os.getenv("HF_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-print("KEY:", os.getenv("GROQ_API_KEY"))
+# New OpenRouter Fallback Client
+openrouter_client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=OPENROUTER_API_KEY,
+)
 
 # Initialize Rate Limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -36,51 +41,38 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
-def call_huggingface(prompt):
-    API_URL = "https://router.huggingface.co/v1/chat/completions"
-
-    headers = {
-        "Authorization": f"Bearer {HF_API_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    payload = {
-        "model": "mistralai/Mixtral-8x7B-Instruct-v0.1",
-        "messages": [
-            {
-                "role": "system",
-                "content": "You are a recruitment expert. Return ONLY JSON with keys: match_score, missing_keywords, tips"
+def call_openrouter_fallback(system_prompt: str, job_description: str, resume_text: str):
+    print("Initiating OpenRouter Fallback...")
+    try:
+        completion = openrouter_client.chat.completions.create(
+            extra_headers={
+                "HTTP-Referer": "http://localhost:8000", # Replace with your app URL
+                "X-Title": "Resume AI Scanner",
             },
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
-        "max_tokens": 500,
-        "temperature": 0.2
-    }
+            # Using a reliable, free-tier model on OpenRouter
+            model="openai/gpt-oss-20b:free", 
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"JD: {job_description}\n\nResume: {resume_text}"}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.1,
+            max_tokens=1000
+        )
+        
+        fallback_response = completion.choices[0].message.content
+        print("Text from OpenRouter: ", fallback_response)
+        return json.loads(fallback_response)
+        
+    except Exception as e:
+        print(f"OpenRouter Fallback also failed: {e}")
+        # Final safety net if both APIs are completely down
+        return {
+            "match_score": 0,
+            "missing_keywords": ["API Error: Could not analyze"],
+            "tips": ["Please try again later. Both primary and fallback AI services are currently unavailable."]
+        }
 
-    response = requests.post(API_URL, headers=headers, json=payload)
-
-    data = response.json()
-    print("HF RAW RESPONSE:", data)
-
-    # Safe extraction
-    if "choices" in data:
-        return data["choices"][0]["message"]["content"]
-
-    # fallback format
-    if "generated_text" in data:
-        return data["generated_text"]
-
-    # fallback list format
-    if isinstance(data, list):
-        return data[0].get("generated_text", str(data))
-
-    return str(data)
-    data = response.json()
-
-    return data["choices"][0]["message"]["content"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -169,7 +161,7 @@ async def analyze_resume(
                 """
             completion = client.chat.completions.create(
                 
-                model="llama-3.3-70b-versatile",
+                model="llama-3.3-70b-versatileqqqq",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": f"JD: {job_description}\n\nResume: {resume_text}"}
@@ -180,28 +172,12 @@ async def analyze_resume(
             return json.loads(completion.choices[0].message.content)
 
         except Exception as e:
-            print("Groq failed → switching to HuggingFace")
 
-            prompt = f"""
-            Return ONLY JSON:
-
-            JD:
-            {job_description}
-
-            Resume:
-            {resume_text}
-
-            Format:
-            {{
-            "match_score": number,
-            "missing_keywords": [],
-            "tips": []
-            }}
-            """
-
-            hf_response = call_huggingface(prompt)
-            print("Text from huggingface: ",hf_response)
-            return json.loads(hf_response)
+            print(f"Groq failed ({e}) → switching to OpenRouter Fallback")
+            
+            # 2. Fallback AI (OpenRouter Llama 8B Free)
+            # We pass the EXACT same system prompt so the JSON schema matches perfectly
+            return call_openrouter_fallback(system_prompt, job_description, resume_text)
 
     except Exception as e:
         return {"status": "error", "message": str(e)}
