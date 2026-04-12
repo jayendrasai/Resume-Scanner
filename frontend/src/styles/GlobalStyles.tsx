@@ -133,5 +133,7 @@ export const GlobalStyle: React.FC = () => (
     .fade-up { animation: fadeUp .45s ease both; }
     .fade-up-2 { animation: fadeUp .45s .1s ease both; }
     .fade-up-3 { animation: fadeUp .45s .2s ease both; }
+
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
   `}</style>
 );

@@ -13,5 +13,9 @@ export interface AnalysisData {
     missing_keywords: string[];
     tips: string[];
 }
-
+export interface HistoryRecord {
+    filename: string;
+    timestamp: string;
+    ip?: string;
+}
 export type Status = "idle" | "loading" | "done" | "error";
