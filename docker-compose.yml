@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    container_name: scanner_backend
+    expose:
+      - "8000" # Expose to internal docker network, not to host machine directly
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend/data:/app/data # Persist your history.json here
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: scanner_frontend
+    ports:
+      - "80:80" # Map host port 80 to container port 80
+    depends_on:
+      - backend # Ensure backend starts first
+    restart: unless-stopped
