@@ -1,8 +1,14 @@
 import axios from 'axios';
 import { getGuestId } from '../utils/auth';
 
+
+// const BASE = import.meta.env.VITE_API_URL ?? "";
+const BASE = import.meta.env.DEV
+    ? import.meta.env.VITE_API_URL
+    : "";
+console.log("BASE: ", BASE);
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL,
+    baseURL: BASE,
     headers: {
         'Content-Type': 'multipart/form-data',
         'X-Guest-ID': getGuestId(),

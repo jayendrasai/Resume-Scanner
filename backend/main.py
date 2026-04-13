@@ -7,6 +7,7 @@ import fitz
 import io
 import os
 import json
+import re
 from groq import Groq
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -17,8 +18,10 @@ import requests
 from openai import OpenAI
 
 
+
 #from middleware import verify_guest_id
 from history_manager import log_activity, get_user_scan_count , get_history
+from middleware import get_real_ip
 
 
 load_dotenv()
@@ -39,6 +42,25 @@ limiter = Limiter(key_func=get_remote_address)
 app = FastAPI()
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+def parse_llm_json(text: str):
+    try:
+        return json.loads(text)
+    except:
+        # extract JSON block
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if not match:
+            raise ValueError("No JSON found")
+
+        cleaned = match.group(0)
+
+        # remove control characters
+        cleaned = cleaned.replace("\n", " ")
+        cleaned = cleaned.replace("\t", " ")
+
+        return json.loads(cleaned)
+
 
 
 def call_openrouter_fallback(system_prompt: str, job_description: str, resume_text: str):
@@ -62,7 +84,7 @@ def call_openrouter_fallback(system_prompt: str, job_description: str, resume_te
         
         fallback_response = completion.choices[0].message.content
         print("Text from OpenRouter: ", fallback_response)
-        return json.loads(fallback_response)
+        return parse_llm_json(fallback_response)
         
     except Exception as e:
         print(f"OpenRouter Fallback also failed: {e}")
@@ -84,7 +106,6 @@ app.add_middleware(
 )
 
 @app.post("/analyze")
-@limiter.limit("3/minute")
 async def analyze_resume(
     request: Request,
     file: UploadFile = File(...), 
@@ -92,20 +113,16 @@ async def analyze_resume(
     #guest_id: str = Depends(verify_guest_id)
 ):
     # --------for docker --------
-    # guest_id = request.headers.get("X-Guest-ID")
-
-    # ip = request.headers.get(
-    #     "x-forwarded-for",
-    #     request.client.host
-    # )
-    # print("Guest:", guest_id)
-    # print("IP:", ip)
+    guest_id = request.headers.get("X-Guest-ID")
+    ip = get_real_ip(request)
+    print("from docker Guest------:", guest_id)
+    print("from docker IP--------:", ip)
 
 
 
     # --------for local --------
-    guest_id = request.headers.get("X-Guest-ID")
-    ip = request.client.host
+    #guest_id = request.headers.get("X-Guest-ID")
+    #ip = request.client.host
 
     count = get_user_scan_count(guest_id, ip)
 
@@ -212,7 +229,9 @@ async def get_my_history(request: Request):
     user_history = [h for h in all_history if h['guest_id'] == guest_id]
     return user_history
 
-
+@app.get("/healthz")
+def health():
+    return {"ok": True}
 
 if __name__ == "__main__":
     import uvicorn

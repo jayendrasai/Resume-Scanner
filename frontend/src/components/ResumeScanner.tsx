@@ -27,7 +27,7 @@ const ResumeScanner: React.FC = () => {
         const fetchHistory = async () => {
             try {
                 // Assuming your backend has a GET /history endpoint for the guest_id
-                const res = await api.get<HistoryRecord[]>('/history');
+                const res = await api.get<HistoryRecord[]>('/api/history');
                 setHistory(res.data);
             } catch (error) {
                 console.error("Could not fetch history");
@@ -56,7 +56,7 @@ const ResumeScanner: React.FC = () => {
 
         try {
             // Axios Integration
-            const response = await api.post<AnalysisData>("/analyze", formData);
+            const response = await api.post<AnalysisData>("/api/analyze", formData);
             setResult(response.data);
             setStatus("done");
 
