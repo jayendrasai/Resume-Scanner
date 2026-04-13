@@ -119,43 +119,6 @@ def call_openrouter_fallback(system_prompt: str, job_description: str, resume_te
     }
 
 
-# def call_openrouter_fallback(system_prompt: str, job_description: str, resume_text: str):
-#     print("Initiating OpenRouter Fallback...")
-#     try:
-#         completion = openrouter_client.chat.completions.create(
-#             extra_headers={
-#                 "HTTP-Referer": "http://localhost:8000", # Replace with your app URL
-#                 "X-Title": "Resume AI Scanner",
-#             },
-#             # Using a reliable, free-tier model on OpenRouter
-#             model="google/gemma-4-31b-it:free", 
-#             messages=[
-#                 {"role": "system", "content": system_prompt},
-#                 {"role": "user", "content": f"JD: {job_description}\n\nResume: {resume_text}"}
-#             ],
-#             #response_format={"type": "json_object"},
-#             temperature=0.1,
-#             max_tokens=1000
-#         )
-#         # Safety Check: Ensure 'choices' actually exists before subscripting
-#         if getattr(completion, 'choices', None) is None or len(completion.choices) == 0:
-#             raise ValueError("API returned an empty choices list.")
- 
-#         fallback_response = completion.choices[0].message.content
-#         print("Text from OpenRouter: ", fallback_response)
-#         return parse_llm_json(fallback_response)
-        
-        
-#     except Exception as e:
-#         print(f"OpenRouter Fallback also failed: {e}")
-#         # Final safety net if both APIs are completely down
-#         return {
-#             "match_score": 0,
-#             "missing_keywords": ["API Error: Could not analyze"],
-#             "tips": ["Please try again later. Both primary and fallback AI services are currently unavailable."]
-#         }
-
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],  # Allows all origins
@@ -175,8 +138,7 @@ async def analyze_resume(
     # --------for docker --------
     guest_id = request.headers.get("X-Guest-ID")
     ip = get_real_ip(request)
-    print("from docker Guest------:", guest_id)
-    print("from docker IP--------:", ip)
+
 
 
 
@@ -186,7 +148,7 @@ async def analyze_resume(
 
     count = get_user_scan_count(guest_id, ip)
 
-    if count >= 8:
+    if count >= 3:
         raise HTTPException(
             status_code=429,
             detail="Limit reached. Try again after 3 hours."

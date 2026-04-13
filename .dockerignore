@@ -32,7 +32,20 @@ docker-compose.yml
 .dockerignore
 Dockerfile
 
-# OS & IDE Files
+# OS & IDE Files (Updated based on explorer view)
 .DS_Store
 .vscode/
 .idea/
+.claude/
+.code-review-graph/
+.code-review-graphignore
+.cursorrules
+.mcp.json
+.opencode.json
+.windsurfrules
+
+# Documentation & Agent Metadata
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+*.md
