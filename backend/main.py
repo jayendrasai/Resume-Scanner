@@ -61,39 +61,99 @@ def parse_llm_json(text: str):
 
         return json.loads(cleaned)
 
-
-
 def call_openrouter_fallback(system_prompt: str, job_description: str, resume_text: str):
-    print("Initiating OpenRouter Fallback...")
-    try:
-        completion = openrouter_client.chat.completions.create(
-            extra_headers={
-                "HTTP-Referer": "http://localhost:8000", # Replace with your app URL
-                "X-Title": "Resume AI Scanner",
-            },
-            # Using a reliable, free-tier model on OpenRouter
-            model="openai/gpt-oss-20b:free", 
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"JD: {job_description}\n\nResume: {resume_text}"}
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.1,
-            max_tokens=1000
-        )
+    print("Initiating OpenRouter Fallback Waterfall...")
+    
+    # Priority list of free models
+    fallback_models = [
+        "google/gemma-4-31b-it:free",
+        "nvidia/nemotron-3-super-120b-a12b:free",
+        "minimax/minimax-m2.5:free",
+        "qwen/qwen3-coder:free",
+        "nvidia/nemotron-3-nano-30b-a3b:free"
+    ]
+
+    for model_name in fallback_models:
+        print(f"Attempting inference with: {model_name}")
+        try:
+            completion = openrouter_client.chat.completions.create(
+                extra_headers={
+                    "HTTP-Referer": "http://localhost:8000", # Replace with your app URL
+                    "X-Title": "Resume AI Scanner",
+                },
+                model=model_name, 
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"JD: {job_description}\n\nResume: {resume_text}"}
+                ],
+                # response_format={"type": "json_object"}, # Kept disabled for free model compatibility
+                temperature=0.1,
+                max_tokens=1000
+            )
+            
+            # Safety Check: Ensure 'choices' actually exists
+            if getattr(completion, 'choices', None) is None or len(completion.choices) == 0:
+                raise ValueError("API returned an empty choices list.")
+     
+            fallback_response = completion.choices[0].message.content
+            
+            if not fallback_response:
+                 raise ValueError("API returned empty message content.")
+                 
+            print(f"Success with {model_name}!")
+            
+            # If parsing succeeds, return the data and EXIT the function
+            return parse_llm_json(fallback_response)
+            
+        except Exception as e:
+            # Catch the error, print it, and the loop will naturally try the next model
+            print(f"Model {model_name} failed: {e}. Moving to next fallback...")
+            continue
+
+    # If the loop finishes and EVERY model failed, hit the final safety net
+    print("All fallback models exhausted. Returning default error state.")
+    return {
+        "match_score": 0,
+        "missing_keywords": ["API Error: Could not analyze"],
+        "tips": ["Please try again later. All AI services are currently experiencing high traffic or downtime."]
+    }
+
+
+# def call_openrouter_fallback(system_prompt: str, job_description: str, resume_text: str):
+#     print("Initiating OpenRouter Fallback...")
+#     try:
+#         completion = openrouter_client.chat.completions.create(
+#             extra_headers={
+#                 "HTTP-Referer": "http://localhost:8000", # Replace with your app URL
+#                 "X-Title": "Resume AI Scanner",
+#             },
+#             # Using a reliable, free-tier model on OpenRouter
+#             model="google/gemma-4-31b-it:free", 
+#             messages=[
+#                 {"role": "system", "content": system_prompt},
+#                 {"role": "user", "content": f"JD: {job_description}\n\nResume: {resume_text}"}
+#             ],
+#             #response_format={"type": "json_object"},
+#             temperature=0.1,
+#             max_tokens=1000
+#         )
+#         # Safety Check: Ensure 'choices' actually exists before subscripting
+#         if getattr(completion, 'choices', None) is None or len(completion.choices) == 0:
+#             raise ValueError("API returned an empty choices list.")
+ 
+#         fallback_response = completion.choices[0].message.content
+#         print("Text from OpenRouter: ", fallback_response)
+#         return parse_llm_json(fallback_response)
         
-        fallback_response = completion.choices[0].message.content
-        print("Text from OpenRouter: ", fallback_response)
-        return parse_llm_json(fallback_response)
         
-    except Exception as e:
-        print(f"OpenRouter Fallback also failed: {e}")
-        # Final safety net if both APIs are completely down
-        return {
-            "match_score": 0,
-            "missing_keywords": ["API Error: Could not analyze"],
-            "tips": ["Please try again later. Both primary and fallback AI services are currently unavailable."]
-        }
+#     except Exception as e:
+#         print(f"OpenRouter Fallback also failed: {e}")
+#         # Final safety net if both APIs are completely down
+#         return {
+#             "match_score": 0,
+#             "missing_keywords": ["API Error: Could not analyze"],
+#             "tips": ["Please try again later. Both primary and fallback AI services are currently unavailable."]
+#         }
 
 
 app.add_middleware(
@@ -126,7 +186,7 @@ async def analyze_resume(
 
     count = get_user_scan_count(guest_id, ip)
 
-    if count >= 3:
+    if count >= 8:
         raise HTTPException(
             status_code=429,
             detail="Limit reached. Try again after 3 hours."

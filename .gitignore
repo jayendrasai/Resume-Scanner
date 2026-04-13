@@ -64,3 +64,4 @@ dist/
 # --- Identity & History ---
 # Ignore the local JSON activity log
 history.json
+data/
