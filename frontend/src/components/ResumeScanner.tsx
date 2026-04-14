@@ -26,6 +26,9 @@ const ResumeScanner: React.FC = () => {
     useEffect(() => {
         const fetchHistory = async () => {
             try {
+                //---for docker running locally-----
+                //const res = await api.get<HistoryRecord[]>('/history');
+
                 // Assuming your backend has a GET /history endpoint for the guest_id
                 const res = await api.get<HistoryRecord[]>('/api/history');
                 setHistory(res.data);
@@ -55,6 +58,10 @@ const ResumeScanner: React.FC = () => {
         formData.append("job_description", jd);
 
         try {
+
+            //---for docker running locally-----
+            //const response = await api.post<AnalysisData>("/api/analyze", formData);
+
             // Axios Integration
             const response = await api.post<AnalysisData>("/api/analyze", formData);
             setResult(response.data);

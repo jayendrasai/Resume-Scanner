@@ -17,9 +17,7 @@ function App() {
         <ResumeScanner />
       </main>
 
-      <footer className="py-6 text-center text-gray-500 text-sm">
-        Day 3: Integration Mode • Powered by Groq & FastAPI
-      </footer>
+
     </div>
   )
 }
