@@ -16,7 +16,8 @@ from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 import requests
 from openai import OpenAI
-
+from auth.router import router as auth_router
+from database import Base, engine
 
 
 #from middleware import verify_guest_id
@@ -40,6 +41,12 @@ openrouter_client = OpenAI(
 # Initialize Rate Limiter
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI()
+@app.on_event("startup")
+async def startup():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+app.include_router(auth_router)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -119,13 +126,29 @@ def call_openrouter_fallback(system_prompt: str, job_description: str, resume_te
     }
 
 
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=[
+#         "http://localhost:5173",
+#         "http://127.0.0.1:5173",
+#         "http://localhost",
+#         "http://10.0.142.161:80"
+#     ],  # Allows all origins
+#     allow_credentials=True,
+#     allow_methods=["POST" , "GET"],  # Allows all methods (GET, POST, PUT, DELETE, etc.)
+#     #allow_headers=["*"],  # Allows all headers
+#     allow_headers=["Content-Type", "X-Guest-ID"]
+# )
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Allows all origins
+    allow_origins=[
+        "*"
+    ],
     allow_credentials=True,
-    allow_methods=["POST" , "GET"],  # Allows all methods (GET, POST, PUT, DELETE, etc.)
-    #allow_headers=["*"],  # Allows all headers
-    allow_headers=["Content-Type", "X-Guest-ID"]
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 @app.post("/analyze")
@@ -138,9 +161,6 @@ async def analyze_resume(
     # --------for docker --------
     guest_id = request.headers.get("X-Guest-ID")
     ip = get_real_ip(request)
-
-
-
 
     # --------for local --------
     #guest_id = request.headers.get("X-Guest-ID")

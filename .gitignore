@@ -1,7 +1,6 @@
 venv/
 __pycache__/
 *.pyc
-.env
 .claude/
 .code-review-graph/
 .mcp.json
@@ -65,3 +64,9 @@ dist/
 # Ignore the local JSON activity log
 history.json
 data/
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+auth.db
