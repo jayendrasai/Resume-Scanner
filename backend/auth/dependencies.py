@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
@@ -10,6 +11,7 @@ from auth.utils import SECRET_KEY, ALGORITHM
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db)
@@ -20,7 +22,11 @@ async def get_current_user(
             detail="Not authenticated"
         )
     try:
-        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(
+            credentials.credentials,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
         user_id: int = int(payload.get("sub"))
     except (JWTError, ValueError):
         raise HTTPException(
@@ -39,17 +45,29 @@ async def get_current_user(
     return user
 
 
-# Day 2 — premium gate (stub it now, wire it on Day 2)
 async def require_premium(user: User = Depends(get_current_user)) -> User:
-    from datetime import datetime, timezone
+    """
+    Correct order matters:
+    1. Check expiry first — expired premium users still have tier='premium' in DB
+    2. Then check tier — catches free users who never subscribed
+    """
+    now = datetime.now(timezone.utc)
+
+    # Step 1: premium user whose subscription lapsed
+    if user.tier == "premium" and user.premium_expires_at:
+        if user.premium_expires_at.replace(tzinfo=timezone.utc) < now:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Premium subscription expired. Please renew to continue.",
+                headers={"X-Upgrade-Required": "true"}
+            )
+
+    # Step 2: free user who never subscribed
     if user.tier != "premium":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Premium subscription required"
+            detail="Premium subscription required.",
+            headers={"X-Upgrade-Required": "true"}
         )
-    if user.premium_expires_at and user.premium_expires_at < datetime.now(timezone.utc):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Premium subscription expired"
-        )
+
     return user
