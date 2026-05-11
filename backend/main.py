@@ -18,6 +18,7 @@ import requests
 from openai import OpenAI
 from auth.router import router as auth_router
 from database import Base, engine
+from auth.dependencies import require_premium
 
 
 #from middleware import verify_guest_id
@@ -261,6 +262,10 @@ async def extract_text(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
 
+
+@app.get("/premium-test")
+async def premium_test(user=Depends(require_premium)):
+    return {"ok": True}
 
 @app.get("/history")
 async def get_my_history(request: Request):

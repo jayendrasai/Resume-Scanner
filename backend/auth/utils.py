@@ -1,4 +1,5 @@
 import os
+import uuid
 from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
 from jose import jwt
@@ -16,11 +17,14 @@ def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
 def create_access_token(user_id: int, email: str, tier: str) -> str:
-    expires = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    now = datetime.now(timezone.utc)
+    expires = now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {
         "sub": str(user_id),
         "email": email,
         "tier": tier,
-        "exp": expires
+        "exp": expires,
+        "iat": now,
+        "jti": str(uuid.uuid4())
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
