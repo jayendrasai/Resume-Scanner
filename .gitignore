@@ -1,6 +1,68 @@
+# =========================
+# Python
+# =========================
 venv/
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+*.pyd
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# =========================
+# Databases
+# =========================
+*.db
+*.sqlite
+*.sqlite3
+auth.db
+
+# =========================
+# Environment Variables
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Logs
+# =========================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# =========================
+# Node / Frontend
+# =========================
+node_modules/
+dist/
+dist-ssr/
+build/
+.vite/
+*.tsbuildinfo
+
+# =========================
+# Editor / IDE
+# =========================
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# =========================
+# AI / Assistant Tools
+# =========================
 .claude/
 .code-review-graph/
 .mcp.json
@@ -11,62 +73,19 @@ AGENTS.md
 CLAUDE.md
 GEMINI.md
 
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# Logs (Keep your existing logs section)
-node_modules
-dist
-dist-ssr
-*.local
-
-# Production
-build/
-dist/
-
-# Environment Variables (CRITICAL)
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Vite / TS specific
-*.tsbuildinfo
-.vite/
-
-# Editor directories and files (Keep your existing section)
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-
-# --- Identity & History ---
-# Ignore the local JSON activity log
+# =========================
+# Local App Data
+# =========================
 history.json
 data/
 
-# Databases
-*.db
-*.sqlite
-*.sqlite3
-auth.db
+# =========================
+# Docker
+# =========================
+*.tar
+docker-compose.override.yml
+
+# =========================
+# OS Files
+# =========================
+Thumbs.db
