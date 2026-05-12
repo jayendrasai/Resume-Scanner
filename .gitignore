@@ -2,6 +2,10 @@
 # Python
 # =========================
 venv/
+venv/
+.venv/
+env/
+ENV/
 __pycache__/
 *.py[cod]
 *.pyo
@@ -36,6 +40,14 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+# Alembic — keep versions, ignore cache
+alembic/__pycache__/
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
 
 # =========================
 # Node / Frontend
@@ -78,6 +90,9 @@ GEMINI.md
 # =========================
 history.json
 data/
+*.db
+*.db-shm
+*.db-wal
 
 # =========================
 # Docker
