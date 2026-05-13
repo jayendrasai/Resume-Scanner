@@ -1,20 +1,64 @@
 services:
+  # 1. Message Broker
+  redis:
+    image: redis:7-alpine
+    container_name: scanner_redis_dev
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # 2. FastAPI Web Server
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile.dev
-
     container_name: scanner_backend_dev
-
     ports:
       - "8000:8000"
-
-    volumes:
-      - ./backend:/app
-
     env_file:
       - ./backend/.env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
+  # 3. Celery Background Worker
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    container_name: scanner_worker_dev
+    env_file:
+      - ./backend/.env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/tasks:/app/tasks # Live reload for task definitions
+
+  # 4. Celery Dashboard
+  flower:
+    image: mher/flower:2.0
+    container_name: scanner_flower_dev
+    ports:
+      - "5555:5555"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - FLOWER_BASIC_AUTH=admin:admin123 # change before production
+    depends_on:
+      - redis
+
+  # 5. React/Vite Client
   frontend:
     build:
       context: ./frontend
