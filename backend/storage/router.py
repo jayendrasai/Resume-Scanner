@@ -5,6 +5,7 @@ from pydantic import BaseModel, field_validator
 from auth.dependencies import require_premium
 from auth.models import User
 from storage.s3 import create_presigned_upload_url, ALLOWED_EXTENSIONS
+from tasks.celery_app import analyze_video
 
 router = APIRouter(prefix="/upload", tags=["storage"])
 
@@ -77,18 +78,11 @@ async def get_presigned_url(
         )
     return PresignResponse(**result)
 
-
 @router.post("/confirm", status_code=202)
 async def confirm_upload(
     payload: JobCreateRequest,
     user: User = Depends(require_premium)
 ):
-    """
-    Called by frontend after S3 PUT succeeds.
-    Day 4 will enqueue the Celery task here.
-    For now: validates the key belongs to this user and returns task placeholder.
-    """
-    # Ownership check — key must belong to this user
     expected_prefix = f"videos/{user.id}/"
     if not payload.object_key.startswith(expected_prefix):
         raise HTTPException(
@@ -96,9 +90,14 @@ async def confirm_upload(
             detail="Object key does not belong to your account"
         )
 
-    # Day 4 will replace this stub with: task = analyze_video.delay(object_key)
+    # Replace Day 3 stub with real Celery enqueue
+    task = analyze_video.delay(
+        object_key=payload.object_key,
+        user_id=user.id
+    )
+
     return {
-        "task_id": "pending-celery-day4",
+        "task_id": task.id,
         "object_key": payload.object_key,
         "status": "queued"
     }
