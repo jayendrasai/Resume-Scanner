@@ -154,10 +154,18 @@ async def test_confirm_success(client):
     )
     user_id = me.json()["id"]
 
-    res = await client.post(
-        "/upload/confirm",
-        json={"object_key": f"videos/{user_id}/test.mp4"},
-        headers={"Authorization": f"Bearer {token}"}
-    )
+    # 1. Create a fake Celery task object
+    mock_task = MagicMock()
+    mock_task.id = "fake-task-uuid"
+
+    # 2. Patch the Celery call so it doesn't try to connect to Redis
+    with patch("storage.router.analyze_video.delay", return_value=mock_task):
+        res = await client.post(
+            "/upload/confirm",
+            json={"object_key": f"videos/{user_id}/test.mp4"},
+            headers={"Authorization": f"Bearer {token}"}
+        )
+    
     assert res.status_code == 202
     assert res.json()["status"] == "queued"
+    assert res.json()["task_id"] == "fake-task-uuid"  # Proves the mock worked
