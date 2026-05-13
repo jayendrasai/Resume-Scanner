@@ -20,6 +20,9 @@ from auth.router import router as auth_router
 from database import Base, engine
 from auth.dependencies import require_premium
 from storage.router import router as storage_router
+from jobs_router import router as jobs_router
+
+
 
 
 
@@ -51,6 +54,7 @@ async def startup():
 
 app.include_router(auth_router)
 app.include_router(storage_router)
+app.include_router(jobs_router)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
