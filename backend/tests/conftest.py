@@ -1,7 +1,16 @@
+import os
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+
+# 1. Inject dummy variables BEFORE importing the app
+os.environ["GROQ_API_KEY"] = "test_groq_key"
+os.environ["OPENROUTER_API_KEY"] = "test_or_key"
+os.environ["AWS_ACCESS_KEY_ID"] = "test_aws_key"
+os.environ["AWS_SECRET_ACCESS_KEY"] = "test_aws_secret"
+os.environ["S3_BUCKET_NAME"] = "test_bucket"
+os.environ["REDIS_URL"] = "redis://localhost:6379/0"
 
 from database import Base, get_db
 from main import app
