@@ -4,6 +4,50 @@ import re
 from groq import Groq
 from openai import OpenAI
 
+# services/ai.py — add after imports, before existing functions
+
+FILLER_WORDS = {
+    "um": r"\bum\b",
+    "uh": r"\buh\b",
+    "like": r"\blike\b",
+    "you know": r"\byou know\b",
+    "so": r"\bso\b",
+}
+
+MIN_TRANSCRIPT_WORDS = 10
+
+
+def count_filler_words(transcript: str) -> dict:
+    """
+    Deterministic string matching — never trust LLM to count tokens.
+    Case-insensitive, whole-word matches only.
+    Returns counts for every filler regardless of whether count is zero.
+    """
+    text = transcript.lower()
+    return {
+        filler: len(re.findall(pattern, text))
+        for filler, pattern in FILLER_WORDS.items()
+    }
+
+
+def validate_transcript(transcript: str) -> None:
+    """
+    Raises ValueError immediately if transcript is unusable.
+    Caller (Celery task) catches this and fails the task with a clear message.
+    No retry — a silent/corrupted video won't improve on retry.
+    """
+    if not transcript or not transcript.strip():
+        raise ValueError(
+            "Transcript is empty. The video may be silent or contain no speech."
+        )
+    word_count = len(transcript.strip().split())
+    if word_count < MIN_TRANSCRIPT_WORDS:
+        raise ValueError(
+            f"Transcript too short ({word_count} words). "
+            "Minimum 10 words required for meaningful analysis. "
+            "Check that the video contains clear speech."
+        )
+
 # ── clients ────────────────────────────────────────────────────────────────
 
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
@@ -123,36 +167,53 @@ def analyze_resume_with_ai(job_description: str, resume_text: str) -> dict:
 # ── video interview analysis (Phase 2 — Day 6 fills this out) ─────────────
 
 INTERVIEW_SYSTEM_PROMPT = """
-You are an expert communication coach analyzing a job interview response.
-Analyze the transcript and return ONLY a valid JSON object matching this schema:
+You are an expert communication coach analyzing a recorded job interview response.
+You will receive a transcript and metadata including estimated speaking pace and filler word counts.
 
+Your task is to assess communication quality and return ONLY a valid JSON object.
+
+CRITICAL INSTRUCTIONS:
+1. pace_wpm: Estimate actual speaking pace as an integer (words per minute).
+   Use the metadata estimate as a reference but adjust based on transcript complexity.
+2. clarity_score: Score overall communication clarity from 0 to 100.
+   Consider: sentence structure, vocabulary appropriateness, logical flow,
+   conciseness, and absence of rambling. 70+ is good, 50-69 needs work, below 50 is poor.
+3. tips: Provide exactly 5 specific, actionable improvement suggestions as plain strings.
+   Reference specific patterns you observe in the transcript.
+   Do NOT give generic advice like "speak more clearly".
+
+RETURN ONLY this JSON schema — no markdown, no explanation:
 {
-  "filler_words": {
-    "um": <count>,
-    "uh": <count>,
-    "like": <count>,
-    "you know": <count>,
-    "so": <count>
-  },
-  "pace_wpm": <integer words per minute>,
+  "pace_wpm": <integer>,
   "clarity_score": <integer 0-100>,
-  "tips": ["tip1", "tip2", "tip3", "tip4", "tip5"]
+  "tips": ["specific tip 1", "specific tip 2", "specific tip 3", "specific tip 4", "specific tip 5"]
 }
 """
 
 
-def analyze_transcript_with_ai(transcript: str, duration_seconds: float) -> dict:
+def analyze_transcript_with_ai(
+    transcript: str,
+    duration_seconds: float
+) -> dict:
     """
-    Called by Celery worker after Whisper transcription.
-    Day 6 wires this into the task pipeline.
+    Receives validated transcript from Celery worker.
+    Filler words counted deterministically here — not by LLM.
+    LLM handles: pace_wpm, clarity_score, tips (semantic tasks only).
     """
     word_count = len(transcript.split())
     duration_minutes = max(duration_seconds / 60, 0.1)
     estimated_wpm = int(word_count / duration_minutes)
 
+    # Deterministic counts — computed before LLM call
+    filler_counts = count_filler_words(transcript)
+    total_fillers = sum(filler_counts.values())
+
     user_content = (
-        f"Interview transcript ({word_count} words, "
-        f"~{estimated_wpm} WPM estimated):\n\n{transcript}"
+        f"Interview transcript:\n\n{transcript}\n\n"
+        f"Metadata: {word_count} words, "
+        f"{duration_seconds:.1f} seconds duration, "
+        f"estimated {estimated_wpm} WPM, "
+        f"{total_fillers} total filler words detected."
     )
 
     try:
@@ -164,11 +225,20 @@ def analyze_transcript_with_ai(transcript: str, duration_seconds: float) -> dict
             ],
             response_format={"type": "json_object"}
         )
-        return json.loads(completion.choices[0].message.content)
+        llm_result = json.loads(completion.choices[0].message.content)
+
     except Exception as e:
         print(f"[AI] Groq transcript analysis failed ({e}) → OpenRouter fallback")
-        return call_openrouter_fallback(
+        llm_result = call_openrouter_fallback(
             INTERVIEW_SYSTEM_PROMPT,
             user_content,
             context_label="transcript"
         )
+
+    # Merge: use deterministic filler counts, LLM handles everything else
+    return {
+        "filler_words": filler_counts,
+        "pace_wpm": llm_result.get("pace_wpm", estimated_wpm),
+        "clarity_score": llm_result.get("clarity_score", 0),
+        "tips": llm_result.get("tips", []),
+    }
