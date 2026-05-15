@@ -7,6 +7,7 @@ from botocore.config import Config
 from botocore.exceptions import ClientError
 from celery import Celery
 from tenacity import retry, stop_after_attempt, wait_exponential
+from services.ai import analyze_transcript_with_ai, validate_transcript
 
 REDIS_URL     = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 AWS_REGION    = os.getenv("AWS_REGION", "us-east-1")
@@ -63,30 +64,35 @@ def delete_from_s3(object_key: str) -> None:
 
 
 # ── FFmpeg audio extraction ─────────────────────────────────────────────────
-
 def extract_audio(video_path: str, wav_path: str) -> float:
-    """
-    Converts video to 16kHz mono WAV.
-    Returns duration in seconds.
-    Raises RuntimeError if ffmpeg fails.
-    """
     cmd = [
-        "ffmpeg", "-y",           # overwrite output without prompt
-        "-i", video_path,         # input video
-        "-ar", "16000",           # 16kHz sample rate (Whisper requirement)
-        "-ac", "1",               # mono channel
-        "-vn",                    # strip video stream
+        "ffmpeg", "-y",
+        "-i", video_path,
+        "-ar", "16000",
+        "-ac", "1",
+        "-vn",
         wav_path
     ]
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True
-    )
+    result = subprocess.run(cmd, capture_output=True, text=True)
+
     if result.returncode != 0:
+        stderr = result.stderr.lower()
+        # All known FFmpeg messages for missing/silent audio tracks
+        no_audio_signals = [
+            "does not contain any stream",
+            "no audio",
+            "output file is empty",
+            "invalid data found",
+            "unable to find a suitable output format",
+        ]
+        if any(signal in stderr for signal in no_audio_signals):
+            raise ValueError(
+                "The uploaded video does not contain a valid audio track. "
+                "Please record a video with clear speech and re-upload."
+            )
         raise RuntimeError(f"FFmpeg failed: {result.stderr}")
 
-    # Get duration via ffprobe
+    # ffprobe for duration
     probe = subprocess.run(
         [
             "ffprobe", "-v", "quiet",
@@ -104,6 +110,54 @@ def extract_audio(video_path: str, wav_path: str) -> float:
 
     print(f"[FFmpeg] Extracted audio → {wav_path} ({duration:.1f}s)")
     return duration
+
+
+
+# def extract_audio(video_path: str, wav_path: str) -> float:
+#     """
+#     Converts video to 16kHz mono WAV.
+#     Returns duration in seconds.
+#     Raises RuntimeError if ffmpeg fails.
+#     """
+#     cmd = [
+#         "ffmpeg", "-y",           # overwrite output without prompt
+#         "-i", video_path,         # input video
+#         "-ar", "16000",           # 16kHz sample rate (Whisper requirement)
+#         "-ac", "1",               # mono channel
+#         "-vn",                    # strip video stream
+#         wav_path
+#     ]
+#     result = subprocess.run(
+#         cmd,
+#         capture_output=True,
+#         text=True
+#     )
+
+#     if result.returncode != 0:
+#         # Catch "no audio track" and fail cleanly without Celery retries
+#         if "does not contain any stream" in result.stderr:
+#             raise ValueError("The uploaded video does not contain an audio track.")
+        
+#         raise RuntimeError(f"FFmpeg failed: {result.stderr}")
+
+#     # Get duration via ffprobe
+#     probe = subprocess.run(
+#         [
+#             "ffprobe", "-v", "quiet",
+#             "-show_entries", "format=duration",
+#             "-of", "default=noprint_wrappers=1:nokey=1",
+#             wav_path
+#         ],
+#         capture_output=True,
+#         text=True
+#     )
+#     try:
+#         duration = float(probe.stdout.strip())
+#     except ValueError:
+#         duration = 0.0
+
+#     print(f"[FFmpeg] Extracted audio → {wav_path} ({duration:.1f}s)")
+#     return duration
 
 
 # ── Whisper transcription with retry ───────────────────────────────────────
@@ -149,6 +203,7 @@ def transcribe_audio(wav_path: str) -> str:
     max_retries=3,
     default_retry_delay=10,
     autoretry_for=(Exception,),
+    dont_autoretry_for=(ValueError,),   # transcript validation failures — no retry
 )
 def analyze_video(self, object_key: str, user_id: int):
     """
@@ -163,6 +218,9 @@ def analyze_video(self, object_key: str, user_id: int):
     tmp_dir = tempfile.mkdtemp(prefix=f"scanner_{task_id}_")
     video_path = os.path.join(tmp_dir, f"{uuid.uuid4()}.mp4")
     wav_path   = os.path.join(tmp_dir, f"{uuid.uuid4()}.wav")
+
+    # 👇 FIX 1: Initialize the tracking variable before the try block
+    s3_cleanup_done = False
 
     try:
         # ── Step 1: Download video from S3 ──────────────────────────────
@@ -185,16 +243,27 @@ def analyze_video(self, object_key: str, user_id: int):
         os.remove(wav_path)
         print(f"[Task {task_id}] WAV deleted from /tmp")
 
-        # ── Step 4: LLM analysis — Day 6 replaces this stub ─────────────
-        analysis = {
-            "filler_words": {},
-            "pace_wpm": 0,
-            "clarity_score": 0,
-            "tips": ["Day 6 will populate this with real LLM analysis"]
-        }
+        # ── Step 4: Validate transcript ─────────────────────────────────
+        print(f"[Task {task_id}] Step 4: Validating transcript")
+        try:
+            validate_transcript(transcript)
+        except ValueError as e:
+            # Hard failure — no retry. Silent/corrupted video won't improve.
+            # Raise without autoretry by wrapping in a non-retried exception path.
+            self.update_state(
+                state="FAILURE",
+                meta={"error": str(e), "exc_type": "TranscriptValidationError"}
+            )
+            raise ValueError(str(e)) from None
 
-        # ── Step 5: Delete video from S3 ────────────────────────────────
+        # ── Step 5: LLM communication analysis ──────────────────────────
+        print(f"[Task {task_id}] Step 5: Analysing transcript")
+        analysis = analyze_transcript_with_ai(transcript, duration_seconds)
+
+        # ── Step 6: Delete video from S3 ────────────────────────────────
         delete_from_s3(object_key)
+        # 👇 FIX 2: Mark it as done so the finally block skips it
+        s3_cleanup_done = True 
         print(f"[Task {task_id}] S3 object deleted")
 
         result = {
@@ -202,14 +271,23 @@ def analyze_video(self, object_key: str, user_id: int):
             "duration_seconds": duration_seconds,
             "analysis": analysis
         }
-        print(f"[Task {task_id}] Complete")
+        print(f"[Task {task_id}] Complete | clarity={analysis['clarity_score']} pace={analysis['pace_wpm']}wpm")
         return result
 
     except Exception as e:
-        # Clean up temp files on any failure
+        print(f"[Task {task_id}] Failed at step: {e}")
+        raise
+
+    finally:
+        # ── Always: clean /tmp ───────────────────────────────────────
         for path in [video_path, wav_path]:
             if os.path.exists(path):
                 os.remove(path)
-                print(f"[Task {task_id}] Cleaned up {path}")
-        print(f"[Task {task_id}] Failed: {e}")
-        raise
+                print(f"[Task {task_id}] Cleaned /tmp: {path}")
+
+        # ── Always: delete S3 object unless already done ─────────────
+        # Covers: ValueError (silent video), RuntimeError (FFmpeg fail),
+        # Whisper failure, LLM failure — every failure path
+        if not s3_cleanup_done:
+            print(f"[Task {task_id}] Cleaning S3 on failure path")
+            delete_from_s3(object_key)
