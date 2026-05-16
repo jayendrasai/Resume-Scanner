@@ -1,13 +1,4 @@
-// import { v4 as uuidv4 } from 'uuid';
 
-// export const getGuestId = (): string => {
-//     let guestId = localStorage.getItem('guest_id');
-//     if (!guestId) {
-//         guestId = uuidv4();
-//         localStorage.setItem('guest_id', guestId);
-//     }
-//     return guestId;
-// };
 
 import { v4 as uuidv4 } from 'uuid';
 
@@ -33,4 +24,43 @@ export const getGuestId = (): string => {
     );
 
     return newId;
+};
+
+// utils/auth.ts — append below existing getGuestId
+
+const TOKEN_KEY = 'auth_token';
+
+export const saveToken = (token: string): void => {
+    localStorage.setItem(TOKEN_KEY, token);
+};
+
+export const getToken = (): string | null => {
+    return localStorage.getItem(TOKEN_KEY);
+};
+
+export const removeToken = (): void => {
+    localStorage.removeItem(TOKEN_KEY);
+};
+
+export const isAuthenticated = (): boolean => {
+    const token = getToken();
+    if (!token) return false;
+    try {
+        // Decode payload — check expiry without a library
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return payload.exp * 1000 > Date.now();
+    } catch {
+        return false;
+    }
+};
+
+export const getTier = (): string | null => {
+    const token = getToken();
+    if (!token) return null;
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return payload.tier ?? null;
+    } catch {
+        return null;
+    }
 };
