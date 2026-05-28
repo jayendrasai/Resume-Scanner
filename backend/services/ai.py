@@ -48,7 +48,7 @@ def validate_transcript(transcript: str) -> None:
             "Check that the video contains clear speech."
         )
 
-# ── clients ────────────────────────────────────────────────────────────────
+# ── clients ────────────────────-───────────────────────────────────────────
 
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
