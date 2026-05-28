@@ -22,6 +22,7 @@ from auth.dependencies import require_premium
 from storage.router import router as storage_router
 from jobs_router import router as jobs_router
 from services.ai import analyze_resume_with_ai, analyze_transcript_with_ai
+from payments.router import router as payments_router
 
 
 
@@ -55,98 +56,10 @@ async def startup():
 app.include_router(auth_router)
 app.include_router(storage_router)
 app.include_router(jobs_router)
+app.include_router(payments_router)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-
-# def parse_llm_json(text: str):
-#     try:
-#         return json.loads(text)
-#     except:
-#         # extract JSON block
-#         match = re.search(r"\{.*\}", text, re.DOTALL)
-#         if not match:
-#             raise ValueError("No JSON found")
-
-#         cleaned = match.group(0)
-
-#         # remove control characters
-#         cleaned = cleaned.replace("\n", " ")
-#         cleaned = cleaned.replace("\t", " ")
-
-#         return json.loads(cleaned)
-
-# def call_openrouter_fallback(system_prompt: str, job_description: str, resume_text: str):
-#     print("Initiating OpenRouter Fallback Waterfall...")
-    
-#     # Priority list of free models
-#     fallback_models = [
-#         "google/gemma-4-31b-it:free",
-#         "nvidia/nemotron-3-super-120b-a12b:free",
-#         "minimax/minimax-m2.5:free",
-#         "qwen/qwen3-coder:free",
-#         "nvidia/nemotron-3-nano-30b-a3b:free"
-#     ]
-
-#     for model_name in fallback_models:
-#         print(f"Attempting inference with: {model_name}")
-#         try:
-#             completion = openrouter_client.chat.completions.create(
-#                 extra_headers={
-#                     "HTTP-Referer": "http://localhost:8000", # Replace with your app URL
-#                     "X-Title": "Resume AI Scanner",
-#                 },
-#                 model=model_name, 
-#                 messages=[
-#                     {"role": "system", "content": system_prompt},
-#                     {"role": "user", "content": f"JD: {job_description}\n\nResume: {resume_text}"}
-#                 ],
-#                 # response_format={"type": "json_object"}, # Kept disabled for free model compatibility
-#                 temperature=0.1,
-#                 max_tokens=1000
-#             )
-            
-#             # Safety Check: Ensure 'choices' actually exists
-#             if getattr(completion, 'choices', None) is None or len(completion.choices) == 0:
-#                 raise ValueError("API returned an empty choices list.")
-     
-#             fallback_response = completion.choices[0].message.content
-            
-#             if not fallback_response:
-#                  raise ValueError("API returned empty message content.")
-                 
-#             print(f"Success with {model_name}!")
-            
-#             # If parsing succeeds, return the data and EXIT the function
-#             return parse_llm_json(fallback_response)
-            
-#         except Exception as e:
-#             # Catch the error, print it, and the loop will naturally try the next model
-#             print(f"Model {model_name} failed: {e}. Moving to next fallback...")
-#             continue
-
-#     # If the loop finishes and EVERY model failed, hit the final safety net
-#     print("All fallback models exhausted. Returning default error state.")
-#     return {
-#         "match_score": 0,
-#         "missing_keywords": ["API Error: Could not analyze"],
-#         "tips": ["Please try again later. All AI services are currently experiencing high traffic or downtime."]
-#     }
-
-
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=[
-#         "http://localhost:5173",
-#         "http://127.0.0.1:5173",
-#         "http://localhost",
-#         "http://10.0.142.161:80"
-#     ],  # Allows all origins
-#     allow_credentials=True,
-#     allow_methods=["POST" , "GET"],  # Allows all methods (GET, POST, PUT, DELETE, etc.)
-#     #allow_headers=["*"],  # Allows all headers
-#     allow_headers=["Content-Type", "X-Guest-ID"]
-# )
 
 
 app.add_middleware(
