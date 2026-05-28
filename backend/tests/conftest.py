@@ -11,6 +11,9 @@ os.environ["AWS_ACCESS_KEY_ID"] = "test_aws_key"
 os.environ["AWS_SECRET_ACCESS_KEY"] = "test_aws_secret"
 os.environ["S3_BUCKET_NAME"] = "test_bucket"
 os.environ["REDIS_URL"] = "redis://localhost:6379/0"
+os.environ["RAZORPAY_KEY_ID"] = "test_rz_key"
+os.environ["RAZORPAY_KEY_SECRET"] = "test_rz_secret"
+os.environ["RAZORPAY_WEBHOOK_SECRET"] = "test_wh_secret"
 
 from database import Base, get_db
 from main import app
