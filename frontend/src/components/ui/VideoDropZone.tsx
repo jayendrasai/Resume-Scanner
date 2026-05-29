@@ -57,10 +57,14 @@ export const VideoDropZone = ({ onFileSelect, disabled }: VideoDropZoneProps) =>
                 onChange={onInputChange}
                 disabled={disabled}
             />
-            
-            <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+
+            {/* <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
                 <rect x="6" y="8" width="24" height="20" rx="2" stroke="var(--muted)" strokeWidth="1.5" />
                 <path d="M14 18l8 5v-10l-8 5z" stroke="var(--accent2)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg> */}
+            <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+                <rect x="6" y="8" width="24" height="20" rx="2" stroke="var(--muted)" strokeWidth="1.5" />
+                <path d="M22 18l-8 5v-10l8 5z" stroke="var(--accent2)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <div style={{ textAlign: "center" }}>
                 <div style={{ fontFamily: "var(--font-head)", fontWeight: 600 }}>Drop your interview video</div>

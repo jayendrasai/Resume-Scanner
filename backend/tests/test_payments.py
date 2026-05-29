@@ -90,7 +90,7 @@ async def test_create_order_free_user(client):
     
     mock_order = {
         "id": "order_test123",
-        "amount": 2900,
+        "amount": 200,
         "currency": "INR",
     }
     
@@ -101,7 +101,7 @@ async def test_create_order_free_user(client):
         )
         assert res.status_code == 200
         assert res.json()["order_id"] == "order_test123"
-        assert res.json()["amount_inr"] == 2900
+        assert res.json()["amount_inr"] == 200
 
 # ── Webhook events ─────────────────────────────────────────────────────────
 @pytest.mark.asyncio

@@ -14,7 +14,7 @@ from payments.schemas import CreateOrderResponse, PassStatusResponse
 router = APIRouter(tags=["payments"])
 
 PREMIUM_DURATION_DAYS = int(os.getenv("PREMIUM_DURATION_DAYS", "30"))
-PASS_PRICE_INR_PAISE = int(os.getenv("PASS_PRICE_INR_PAISE", "2900"))
+PASS_PRICE_INR_PAISE = int(os.getenv("PASS_PRICE_INR_PAISE", "200"))
 
 # ── 1. Create Order (Authenticated) ──────────────────────────────────────────
 @router.post("/billing/create-order", response_model=CreateOrderResponse)
@@ -57,6 +57,10 @@ async def create_pass_order(
 # ── 2. Pass Status (Authenticated) ───────────────────────────────────────────
 @router.get("/billing/status", response_model=PassStatusResponse)
 async def pass_status(user: User = Depends(get_current_user)):
+    print("user found: ",user)
+    print(user.tier)
+    print(user.premium_expires_at)
+    print("user id: ",user.id)
     """Frontend polls this to check if tier upgraded."""
     return PassStatusResponse(
         tier=user.tier,
@@ -73,7 +77,8 @@ async def razorpay_webhook(
 ):
     body = await request.body()
     signature = request.headers.get("X-Razorpay-Signature", "")
-
+    # print("body: ",body)
+    # print("signature: ",signature)
     if not verify_webhook_signature(body, signature):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

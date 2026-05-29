@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getMe, getBillingStatus, createOrder } from '../api/authApi';
-import { saveToken, removeToken, refreshToken } from '../utils/auth';
+import { removeToken } from '../utils/auth';
 import type { UserProfile, PassStatus } from '../api/authApi';
 
 
