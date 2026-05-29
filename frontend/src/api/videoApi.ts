@@ -36,7 +36,7 @@ export const validateVideoFile = (file: File): string | null => {
 // ── Step 1: Get presigned URL ──────────────────────────────────────────────
 
 export const getPresignedUrl = async (filename: string): Promise<PresignResponse> => {
-    const res = await authApi.post<PresignResponse>('/upload/presign', { filename });
+    const res = await authApi.post<PresignResponse>('/v1/upload/presign', { filename });
     return res.data;
 };
 
@@ -61,7 +61,7 @@ export const uploadToS3 = async (
 
 export const confirmUpload = async (objectKey: string): Promise<string> => {
     const res = await authApi.post<{ task_id: string; status: string }>(
-        '/upload/confirm',
+        '/v1/upload/confirm',
         { object_key: objectKey }
     );
     return res.data.task_id;
@@ -70,7 +70,7 @@ export const confirmUpload = async (objectKey: string): Promise<string> => {
 // ── Step 4: Poll job status ────────────────────────────────────────────────
 
 export const getJobStatus = async (taskId: string): Promise<JobStatusResponse> => {
-    const res = await authApi.get<JobStatusResponse>(`/jobs/${taskId}/status`);
+    const res = await authApi.get<JobStatusResponse>(`/v1/jobs/${taskId}/status`);
     return res.data;
 };
 
@@ -81,7 +81,7 @@ export const loginUser = async (
     password: string
 ): Promise<string> => {
     const res = await authApi.post<{ access_token: string }>(
-        '/auth/login',
+        '/v1/auth/login',
         { email, password }
     );
     return res.data.access_token;
@@ -92,7 +92,7 @@ export const registerUser = async (
     password: string
 ): Promise<string> => {
     const res = await authApi.post<{ access_token: string }>(
-        '/auth/register',
+        '/v1/auth/register',
         { email, password }
     );
     return res.data.access_token;

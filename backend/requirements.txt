@@ -24,3 +24,4 @@ passlib[bcrypt]
 tenacity==8.3.0
 razorpay==1.4.2
 setuptools==81.0.0
+structlog==24.1.0

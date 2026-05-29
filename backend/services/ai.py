@@ -3,6 +3,7 @@ import json
 import re
 from groq import Groq
 from openai import OpenAI
+from logger import log
 
 # services/ai.py — add after imports, before existing functions
 
@@ -37,11 +38,13 @@ def validate_transcript(transcript: str) -> None:
     No retry — a silent/corrupted video won't improve on retry.
     """
     if not transcript or not transcript.strip():
+        log.error("Transcript is empty. The video may be silent or contain no speech.")
         raise ValueError(
             "Transcript is empty. The video may be silent or contain no speech."
         )
     word_count = len(transcript.strip().split())
     if word_count < MIN_TRANSCRIPT_WORDS:
+        log.error(f"Transcript too short ({word_count} words). Minimum 10 words required for meaningful analysis. Check that the video contains clear speech.")
         raise ValueError(
             f"Transcript too short ({word_count} words). "
             "Minimum 10 words required for meaningful analysis. "
@@ -65,6 +68,7 @@ def parse_llm_json(text: str) -> dict:
     except Exception:
         match = re.search(r"\{.*\}", text, re.DOTALL)
         if not match:
+            log.error("No JSON found in LLM response", text=text)
             raise ValueError("No JSON found in LLM response")
         cleaned = match.group(0).replace("\n", " ").replace("\t", " ")
         return json.loads(cleaned)
@@ -107,9 +111,9 @@ def call_openrouter_fallback(
     user_content: str,
     context_label: str = "resume"
 ) -> dict:
-    print(f"[AI] OpenRouter fallback triggered for: {context_label}")
+    log.info(f"OpenRouter fallback triggered for: {context_label}")
     for model_name in OPENROUTER_FALLBACK_MODELS:
-        print(f"[AI] Trying {model_name}")
+        log.info(f"Trying {model_name}")
         try:
             completion = openrouter_client.chat.completions.create(
                 extra_headers={
@@ -125,22 +129,49 @@ def call_openrouter_fallback(
                 max_tokens=1000
             )
             if not getattr(completion, "choices", None):
+                log.error("Empty choices")
                 raise ValueError("Empty choices")
             content = completion.choices[0].message.content
             if not content:
+                log.error("Empty content")
                 raise ValueError("Empty content")
-            print(f"[AI] Success with {model_name}")
+            log.info(f"Success with {model_name}")
             return parse_llm_json(content)
         except Exception as e:
-            print(f"[AI] {model_name} failed: {e}")
+            log.error(f" {model_name} failed: ", e)
             continue
 
+    log.error("All AI services are currently unavailable.")
     return {
         "match_score": 0,
         "missing_keywords": ["API Error: Could not analyze"],
         "tips": ["Please try again later. All AI services are currently unavailable."]
     }
 
+
+# services/ai.py — add before analyze_resume_with_ai
+
+MAX_JD_LENGTH = 5000  # characters
+MAX_RESUME_LENGTH = 15000
+
+def sanitize_llm_input(text: str, max_length: int, field_name: str) -> str:
+    """
+    Strips null bytes, excessive whitespace, and truncates to max length.
+    Does not block content — LLM handles adversarial prompts via system
+    prompt isolation. This prevents token bloat and injection via length.
+    """
+    if not text or not text.strip():
+        log.error(f"{field_name} cannot be empty")
+        raise ValueError(f"{field_name} cannot be empty")
+    # Strip null bytes — can cause encoding issues
+    cleaned = text.replace('\x00', '')
+    # Collapse excessive whitespace
+    cleaned = ' '.join(cleaned.split())
+    # Truncate — prevents token limit abuse
+    if len(cleaned) > max_length:
+        log.warning(f"{field_name} is too long. Truncating to {max_length} characters.")
+        cleaned = cleaned[:max_length]
+    return cleaned
 
 def analyze_resume_with_ai(job_description: str, resume_text: str) -> dict:
     """Called by FastAPI /analyze endpoint — Phase 1 logic unchanged."""
@@ -156,7 +187,7 @@ def analyze_resume_with_ai(job_description: str, resume_text: str) -> dict:
         )
         return json.loads(completion.choices[0].message.content)
     except Exception as e:
-        print(f"[AI] Groq failed ({e}) → OpenRouter fallback")
+        log.error(f"Groq failed ({e}) → OpenRouter fallback")
         return call_openrouter_fallback(
             RESUME_SYSTEM_PROMPT,
             user_content,
@@ -228,7 +259,7 @@ def analyze_transcript_with_ai(
         llm_result = json.loads(completion.choices[0].message.content)
 
     except Exception as e:
-        print(f"[AI] Groq transcript analysis failed ({e}) → OpenRouter fallback")
+        log.error(f"Groq transcript analysis failed ({e}) → OpenRouter fallback")
         llm_result = call_openrouter_fallback(
             INTERVIEW_SYSTEM_PROMPT,
             user_content,

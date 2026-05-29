@@ -21,8 +21,9 @@ from database import Base, engine
 from auth.dependencies import require_premium
 from storage.router import router as storage_router
 from jobs_router import router as jobs_router
-from services.ai import analyze_resume_with_ai, analyze_transcript_with_ai
+from services.ai import analyze_resume_with_ai, analyze_transcript_with_ai , sanitize_llm_input,MAX_JD_LENGTH,MAX_RESUME_LENGTH
 from payments.router import router as payments_router
+from logger import log
 
 
 
@@ -53,26 +54,54 @@ async def startup():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-app.include_router(auth_router)
-app.include_router(storage_router)
-app.include_router(jobs_router)
-app.include_router(payments_router)
+# app.include_router(auth_router)
+# app.include_router(storage_router)
+# app.include_router(jobs_router)
+# app.include_router(payments_router)
+# main.py — update all router mounts:
+app.include_router(auth_router,     prefix="/v1")
+app.include_router(storage_router,  prefix="/v1")
+app.include_router(jobs_router,     prefix="/v1")
+app.include_router(payments_router, prefix="/v1")
+
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://172.18.0.6:5173").split(",")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "*"
-    ],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET" , "POST"],
+    allow_headers=["Content-Type", "Authorization", "X-Guest-ID"],
 )
 
-@app.post("/analyze")
+
+# main.py — replace PDF validation block
+async def validate_pdf_magic_bytes(file: UploadFile) -> bytes:
+    """
+    PDF magic number: first 4 bytes must be %PDF
+    Validates actual file content, not just extension.
+    """
+    pdf_content = await file.read()
+    if not pdf_content[:4] == b'%PDF':
+        log.error("Invalid file. Only PDF files are accepted.")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file. Only PDF files are accepted."
+        )
+
+    # Size check — 5MB
+    if len(pdf_content) > 5 * 1024 * 1024:
+        log.error("File too large. Maximum size is 5 MB.")
+        raise HTTPException(
+            status_code=413,
+            detail="File too large. Maximum size is 5 MB."
+        )
+    return pdf_content
+
+@app.post("/v1/analyze")
 async def analyze_resume(
     request: Request,
     file: UploadFile = File(...), 
@@ -82,14 +111,15 @@ async def analyze_resume(
     # --------for docker --------
     guest_id = request.headers.get("X-Guest-ID")
     ip = get_real_ip(request)
-
+    log.info("User IP", ip=ip, guest_id=guest_id)
     # --------for local --------
     #guest_id = request.headers.get("X-Guest-ID")
     #ip = request.client.host
 
     count = get_user_scan_count(guest_id, ip)
-
+    log.info("User Scan Count", guest_id=guest_id, ip=ip, count=count)
     if count >= 3:
+        log.error("Limit reached. Try again after 3 hours.")
         raise HTTPException(
             status_code=429,
             detail="Limit reached. Try again after 3 hours."
@@ -97,13 +127,15 @@ async def analyze_resume(
 
     log_activity(guest_id, ip, file.filename)
 
+    pdf_content = await validate_pdf_magic_bytes(file)
+
     # 1. Validation
-    if not file.filename.endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="Only PDF files are accepted.")
+    # if not file.filename.endswith('.pdf'):
+    #     raise HTTPException(status_code=400, detail="Only PDF files are accepted.")
 
     try:
         # 2. In-Memory Extraction
-        pdf_content = await file.read()
+        #pdf_content = await file.read()
         doc = fitz.open(stream=pdf_content, filetype="pdf")
         resume_text = ""
         for page in doc:
@@ -111,17 +143,32 @@ async def analyze_resume(
 
         # 3. Validation of content
         if not resume_text.strip():
+            log.error("Could not extract text from PDF.")
             raise HTTPException(status_code=400, detail="Could not extract text from PDF.")
-
+        
+        # After PDF extraction, before AI call:
+        try:
+            job_description = sanitize_llm_input(
+                job_description, MAX_JD_LENGTH, "Job description"
+            )
+            resume_text = sanitize_llm_input(
+                resume_text, MAX_RESUME_LENGTH, "Resume"
+            )
+        except ValueError as e:
+            log.error("Invalid input", error=str(e))
+            raise HTTPException(status_code=400, detail=str(e))
+        log.info("Sanitized Input")
         return analyze_resume_with_ai(job_description, resume_text)
 
     except Exception as e:
+        log.error("Unexpected Error", error=str(e))
         return {"status": "error", "message": str(e)}
 
-@app.post("/extract-text")
+@app.post("/v1/extract-text")
 async def extract_text(file: UploadFile = File(...)):
     # Validate file type
     if file.content_type != "application/pdf":
+        log.error("Invalid file. Only PDF files are accepted.")
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
     try:
@@ -136,14 +183,15 @@ async def extract_text(file: UploadFile = File(...)):
         return {"filename": file.filename, "text": full_text}
     
     except Exception as e:
+        log.error("Error processing PDF", error=str(e))
         raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
 
 
-@app.get("/premium-test")
+@app.get("/v1/premium-test")
 async def premium_test(user=Depends(require_premium)):
     return {"ok": True}
 
-@app.get("/history")
+@app.get("/v1/history")
 async def get_my_history(request: Request):
     guest_id = request.headers.get("X-Guest-ID")
 

@@ -1,5 +1,9 @@
 import pytest
 from unittest.mock import patch, MagicMock
+import logging
+
+# Initialize the logger
+log = logging.getLogger(__name__)
 
 
 # ── Filler word counter ─────────────────────────────────────────────────────

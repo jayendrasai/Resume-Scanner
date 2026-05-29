@@ -6,7 +6,7 @@ from tests.conftest import TestSessionLocal
 
 
 async def get_premium_token(client, email="jobpremium@test.com") -> tuple[str, int]:
-    reg = await client.post("/auth/register", json={
+    reg = await client.post("/v1/auth/register", json={
         "email": email, "password": "pass1234"
     })
     token = reg.json()["access_token"]
@@ -20,12 +20,12 @@ async def get_premium_token(client, email="jobpremium@test.com") -> tuple[str, i
         await db.commit()
 
     refresh = await client.post(
-        "/auth/refresh",
+        "/v1/auth/refresh",
         headers={"Authorization": f"Bearer {token}"}
     )
     token = refresh.json()["access_token"]
 
-    me = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    me = await client.get("/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
     return token, me.json()["id"]
 
 
@@ -38,7 +38,7 @@ async def test_create_job_success(client):
 
     with patch("jobs_router.analyze_video.delay", return_value=mock_task):
         res = await client.post(
-            "/jobs/create",
+            "/v1/jobs/create",
             json={"object_key": f"videos/{user_id}/test.mp4"},
             headers={"Authorization": f"Bearer {token}"}
         )
@@ -53,7 +53,7 @@ async def test_create_job_wrong_owner(client):
     token, user_id = await get_premium_token(client, "owner@test.com")
 
     res = await client.post(
-        "/jobs/create",
+        "/v1/jobs/create",
         json={"object_key": "videos/999/test.mp4"},
         headers={"Authorization": f"Bearer {token}"}
     )
@@ -62,13 +62,13 @@ async def test_create_job_wrong_owner(client):
 
 @pytest.mark.asyncio
 async def test_create_job_free_user_blocked(client):
-    reg = await client.post("/auth/register", json={
+    reg = await client.post("/v1/auth/register", json={
         "email": "freejob@test.com", "password": "pass"
     })
     token = reg.json()["access_token"]
 
     res = await client.post(
-        "/jobs/create",
+        "/v1/jobs/create",
         json={"object_key": "videos/1/test.mp4"},
         headers={"Authorization": f"Bearer {token}"}
     )
@@ -85,7 +85,7 @@ async def test_job_status_pending(client):
 
     with patch("jobs_router.AsyncResult", return_value=mock_result):
         res = await client.get(
-            "/jobs/fake-task-id/status",
+            "/v1/jobs/fake-task-id/status",
             headers={"Authorization": f"Bearer {token}"}
         )
 
@@ -108,7 +108,7 @@ async def test_job_status_success(client):
 
     with patch("jobs_router.AsyncResult", return_value=mock_result):
         res = await client.get(
-            "/jobs/fake-task-id/status",
+            "/v1/jobs/fake-task-id/status",
             headers={"Authorization": f"Bearer {token}"}
         )
 
@@ -127,7 +127,7 @@ async def test_job_status_failure(client):
 
     with patch("jobs_router.AsyncResult", return_value=mock_result):
         res = await client.get(
-            "/jobs/fake-task-id/status",
+            "/v1/jobs/fake-task-id/status",
             headers={"Authorization": f"Bearer {token}"}
         )
 

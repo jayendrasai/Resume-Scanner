@@ -18,7 +18,7 @@ def setup_razorpay_env(monkeypatch):
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 async def make_premium_user(client, email="pay@test.com") -> tuple[str, int]:
-    reg = await client.post("/auth/register", json={
+    reg = await client.post("/v1/auth/register", json={
         "email": email, "password": "pass1234"
     })
     token = reg.json()["access_token"]
@@ -30,18 +30,18 @@ async def make_premium_user(client, email="pay@test.com") -> tuple[str, int]:
         await db.commit()
         
     refresh = await client.post(
-        "/auth/refresh", headers={"Authorization": f"Bearer {token}"}
+        "/v1/auth/refresh", headers={"Authorization": f"Bearer {token}"}
     )
     token = refresh.json()["access_token"]
-    me = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    me = await client.get("/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
     return token, me.json()["id"]
 
 async def make_free_user(client, email="free_pay@test.com") -> tuple[str, int]:
-    reg = await client.post("/auth/register", json={
+    reg = await client.post("/v1/auth/register", json={
         "email": email, "password": "pass1234"
     })
     token = reg.json()["access_token"]
-    me = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    me = await client.get("/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
     return token, me.json()["id"]
 
 def make_webhook_payload(event_type: str, order_id: str) -> tuple[bytes, str]:
@@ -96,7 +96,7 @@ async def test_create_order_free_user(client):
     
     with patch("payments.router.create_order", return_value=mock_order):
         res = await client.post(
-            "/billing/create-order",
+            "/v1/billing/create-order",
             headers={"Authorization": f"Bearer {token}"}
         )
         assert res.status_code == 200
@@ -107,7 +107,7 @@ async def test_create_order_free_user(client):
 @pytest.mark.asyncio
 async def test_webhook_invalid_signature(client):
     res = await client.post(
-        "/webhooks/razorpay",
+        "/v1/webhooks/razorpay",
         content=b'{"event": "order.paid"}',
         headers={
             "Content-Type": "application/json",
@@ -132,7 +132,7 @@ async def test_webhook_order_paid(client):
     body, sig = make_webhook_payload("order.paid", "order_paid_test")
     
     res = await client.post(
-        "/webhooks/razorpay",
+        "/v1/webhooks/razorpay",
         content=body,
         headers={
             "Content-Type": "application/json",
@@ -156,7 +156,7 @@ async def test_webhook_unknown_order_id(client):
     body, sig = make_webhook_payload("order.paid", "order_does_not_exist")
     
     res = await client.post(
-        "/webhooks/razorpay",
+        "/v1/webhooks/razorpay",
         content=body,
         headers={
             "Content-Type": "application/json",
@@ -173,7 +173,7 @@ async def test_billing_status(client):
     token, _ = await make_free_user(client, "status_check@test.com")
     
     res = await client.get(
-        "/billing/status",
+        "/v1/billing/status",
         headers={"Authorization": f"Bearer {token}"}
     )
     assert res.status_code == 200

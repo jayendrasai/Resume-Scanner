@@ -3,7 +3,7 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_register_success(client):
-    res = await client.post("/auth/register", json={
+    res = await client.post("/v1/auth/register", json={
         "email": "user@test.com",
         "password": "securepass"
     })
@@ -14,17 +14,17 @@ async def test_register_success(client):
 @pytest.mark.asyncio
 async def test_register_duplicate_email(client):
     payload = {"email": "dupe@test.com", "password": "pass123"}
-    await client.post("/auth/register", json=payload)
-    res = await client.post("/auth/register", json=payload)
+    await client.post("/v1/auth/register", json=payload)
+    res = await client.post("/v1/auth/register", json=payload)
     assert res.status_code == 409
 
 
 @pytest.mark.asyncio
 async def test_login_success(client):
-    await client.post("/auth/register", json={
+    await client.post("/v1/auth/register", json={
         "email": "login@test.com", "password": "mypassword"
     })
-    res = await client.post("/auth/login", json={
+    res = await client.post("/v1/auth/login", json={
         "email": "login@test.com", "password": "mypassword"
     })
     assert res.status_code == 200
@@ -33,10 +33,10 @@ async def test_login_success(client):
 
 @pytest.mark.asyncio
 async def test_login_wrong_password(client):
-    await client.post("/auth/register", json={
+    await client.post("/v1/auth/register", json={
         "email": "wrong@test.com", "password": "correct"
     })
-    res = await client.post("/auth/login", json={
+    res = await client.post("/v1/auth/login", json={
         "email": "wrong@test.com", "password": "incorrect"
     })
     assert res.status_code == 401
@@ -44,12 +44,12 @@ async def test_login_wrong_password(client):
 
 @pytest.mark.asyncio
 async def test_me_authenticated(client):
-    reg = await client.post("/auth/register", json={
+    reg = await client.post("/v1/auth/register", json={
         "email": "me@test.com", "password": "pass123"
     })
     token = reg.json()["access_token"]
     res = await client.get(
-        "/auth/me",
+        "/v1/auth/me",
         headers={"Authorization": f"Bearer {token}"}
     )
     assert res.status_code == 200
@@ -58,7 +58,7 @@ async def test_me_authenticated(client):
 
 @pytest.mark.asyncio
 async def test_me_no_token(client):
-    res = await client.get("/auth/me")
+    res = await client.get("/v1/auth/me")
     assert res.status_code == 401
 
 
@@ -75,14 +75,14 @@ async def test_free_user_blocked_from_premium_route(client):
 
     test_app = FastAPI()
 
-    @test_app.get("/test-premium")
+    @test_app.get("/v1/test-premium")
     async def premium_route(user=pytest.importorskip and __import__(
         'fastapi', fromlist=['Depends']
     ).Depends(require_premium)):
         return {"ok": True}
 
     # Register + get token
-    reg = await client.post("/auth/register", json={
+    reg = await client.post("/v1/auth/register", json={
         "email": "free@test.com", "password": "pass"
     })
     token = reg.json()["access_token"]
@@ -92,12 +92,12 @@ async def test_free_user_blocked_from_premium_route(client):
     from auth.dependencies import require_premium as rp
     from fastapi import Depends
 
-    @main_app.get("/test-premium-gate")
+    @main_app.get("/v1/test-premium-gate")
     async def _gate(u=Depends(rp)):
         return {"ok": True}
 
     res = await client.get(
-        "/test-premium-gate",
+        "/v1/test-premium-gate",
         headers={"Authorization": f"Bearer {token}"}
     )
     assert res.status_code == 403
@@ -109,12 +109,12 @@ async def test_free_user_blocked_from_premium_route(client):
 
 @pytest.mark.asyncio
 async def test_refresh_token(client):
-    reg = await client.post("/auth/register", json={
+    reg = await client.post("/v1/auth/register", json={
         "email": "refresh@test.com", "password": "pass123"
     })
     token = reg.json()["access_token"]
     res = await client.post(
-        "/auth/refresh",
+        "/v1/auth/refresh",
         headers={"Authorization": f"Bearer {token}"}
     )
     assert res.status_code == 200

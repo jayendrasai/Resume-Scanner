@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock
 
 async def get_premium_token(client) -> str:
     """Register a user and manually flip tier to premium for storage tests."""
-    reg = await client.post("/auth/register", json={
+    reg = await client.post("/v1/auth/register", json={
         "email": "premium@test.com",
         "password": "pass1234"
     })
@@ -27,14 +27,14 @@ async def get_premium_token(client) -> str:
 
     # Refresh token so JWT carries updated tier
     refresh = await client.post(
-        "/auth/refresh",
+        "/v1/auth/refresh",
         headers={"Authorization": f"Bearer {token}"}
     )
     return refresh.json()["access_token"]
 
 
 async def get_free_token(client) -> str:
-    reg = await client.post("/auth/register", json={
+    reg = await client.post("/v1/auth/register", json={
         "email": "free@test.com",
         "password": "pass1234"
     })
@@ -47,7 +47,7 @@ async def get_free_token(client) -> str:
 async def test_presign_requires_premium(client):
     token = await get_free_token(client)
     res = await client.post(
-        "/upload/presign",
+        "/v1/upload/presign",
         json={"filename": "interview.mp4"},
         headers={"Authorization": f"Bearer {token}"}
     )
@@ -57,7 +57,7 @@ async def test_presign_requires_premium(client):
 @pytest.mark.asyncio
 async def test_presign_unauthenticated(client):
     res = await client.post(
-        "/upload/presign",
+        "/v1/upload/presign",
         json={"filename": "interview.mp4"}
     )
     assert res.status_code == 401
@@ -68,7 +68,7 @@ async def test_presign_invalid_extension(client):
     token = await get_premium_token(client)
     with patch("storage.s3.boto3.client"):
         res = await client.post(
-            "/upload/presign",
+            "/v1/upload/presign",
             json={"filename": "malware.exe"},
             headers={"Authorization": f"Bearer {token}"}
         )
@@ -79,7 +79,7 @@ async def test_presign_invalid_extension(client):
 async def test_presign_path_traversal_blocked(client):
     token = await get_premium_token(client)
     res = await client.post(
-        "/upload/presign",
+        "/v1/upload/presign",
         json={"filename": "../../etc/passwd.mp4"},
         headers={"Authorization": f"Bearer {token}"}
     )
@@ -98,7 +98,7 @@ async def test_presign_success(client):
 
     with patch("storage.s3.boto3.client", return_value=mock_s3):
         res = await client.post(
-            "/upload/presign",
+            "/v1/upload/presign",
             json={"filename": "interview.mp4"},
             headers={"Authorization": f"Bearer {token}"}
         )
@@ -120,12 +120,12 @@ async def test_confirm_wrong_user_key_blocked(client):
     token = await get_premium_token(client)
 
     # Register a second premium user
-    await client.post("/auth/register", json={
+    await client.post("/v1/auth/register", json={
         "email": "other@test.com", "password": "pass"
     })
 
     res = await client.post(
-        "/upload/confirm",
+        "/v1/upload/confirm",
         json={"object_key": "videos/999/somefile.mp4"},  # 999 != this user's id
         headers={"Authorization": f"Bearer {token}"}
     )
@@ -136,7 +136,7 @@ async def test_confirm_wrong_user_key_blocked(client):
 async def test_confirm_invalid_key_format(client):
     token = await get_premium_token(client)
     res = await client.post(
-        "/upload/confirm",
+        "/v1/upload/confirm",
         json={"object_key": "../../etc/shadow"},
         headers={"Authorization": f"Bearer {token}"}
     )
@@ -149,7 +149,7 @@ async def test_confirm_success(client):
 
     # Get this user's actual id from /auth/me
     me = await client.get(
-        "/auth/me",
+        "/v1/auth/me",
         headers={"Authorization": f"Bearer {token}"}
     )
     user_id = me.json()["id"]
@@ -161,7 +161,7 @@ async def test_confirm_success(client):
     # 2. Patch the Celery call so it doesn't try to connect to Redis
     with patch("storage.router.analyze_video.delay", return_value=mock_task):
         res = await client.post(
-            "/upload/confirm",
+            "/v1/upload/confirm",
             json={"object_key": f"videos/{user_id}/test.mp4"},
             headers={"Authorization": f"Bearer {token}"}
         )
