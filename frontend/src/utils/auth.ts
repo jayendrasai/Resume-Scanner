@@ -40,6 +40,7 @@ export const getToken = (): string | null => {
 
 export const removeToken = (): void => {
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem('guest_id_data');
 };
 
 export const isAuthenticated = (): boolean => {
@@ -62,5 +63,22 @@ export const getTier = (): string | null => {
         return payload.tier ?? null;
     } catch {
         return null;
+    }
+};
+// utils/auth.ts — append
+export const refreshToken = async (): Promise<void> => {
+    try {
+        const currentToken = getToken();
+        if (!currentToken) return;
+        const res = await fetch('/auth/refresh', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${currentToken}` }
+        });
+        if (res.ok) {
+            const data = await res.json();
+            saveToken(data.access_token);
+        }
+    } catch {
+        // silent fail — user will be prompted to re-login on next 401
     }
 };
