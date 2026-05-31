@@ -187,32 +187,32 @@ def analyze_video(self, object_key: str, user_id: int):
 
     try:
         # ── Step 1: Download video from S3 ──────────────────────────────
-        #print(f"[Task {task_id}] Step 1: Downloading from S3")
+        print(f"[Task {task_id}] Step 1: Downloading from S3")
         log.info("Task Step 1: Downloading from S3", task_id=task_id)
         download_from_s3(object_key, video_path)
 
         # ── Step 2: Extract audio with FFmpeg ───────────────────────────
-        #print(f"[Task {task_id}] Step 2: Extracting audio")
+        print(f"[Task {task_id}] Step 2: Extracting audio")
         log.info("Task Step 2: Extracting audio", task_id=task_id)
         duration_seconds = extract_audio(video_path, wav_path)
 
         # Delete video immediately — only WAV needed from here
         os.remove(video_path)
-        #print(f"[Task {task_id}] Video deleted from /tmp")
+        print(f"[Task {task_id}] Video deleted from /tmp")
         log.info("Task Video Deleted", task_id=task_id)
 
         # ── Step 3: Transcribe with Groq Whisper ────────────────────────
-        #print(f"[Task {task_id}] Step 3: Transcribing audio")
+        print(f"[Task {task_id}] Step 3: Transcribing audio")
         log.info("Task Step 3: Transcribing audio", task_id=task_id)
         transcript = transcribe_audio(wav_path)
 
         # Delete WAV after transcription — no audio persisted
         os.remove(wav_path)
-        #print(f"[Task {task_id}] WAV deleted from /tmp")
+        print(f"[Task {task_id}] WAV deleted from /tmp")
         log.info("Task WAV Deleted", task_id=task_id)
 
         # ── Step 4: Validate transcript ─────────────────────────────────
-        #print(f"[Task {task_id}] Step 4: Validating transcript")
+        print(f"[Task {task_id}] Step 4: Validating transcript")
         log.info("Task Step 4: Validating transcript", task_id=task_id)
         try:
             validate_transcript(transcript)
@@ -227,7 +227,7 @@ def analyze_video(self, object_key: str, user_id: int):
             raise ValueError(str(e)) from None
 
         # ── Step 5: LLM communication analysis ──────────────────────────
-        #print(f"[Task {task_id}] Step 5: Analysing transcript")
+        print(f"[Task {task_id}] Step 5: Analysing transcript")
         log.info("Task Step 5: Analysing transcript", task_id=task_id)
         analysis = analyze_transcript_with_ai(transcript, duration_seconds)
 
@@ -235,7 +235,7 @@ def analyze_video(self, object_key: str, user_id: int):
         delete_from_s3(object_key)
         # 👇 FIX 2: Mark it as done so the finally block skips it
         s3_cleanup_done = True 
-        #print(f"[Task {task_id}] S3 object deleted")
+        print(f"[Task {task_id}] S3 object deleted")
         log.info("Task S3 Object Deleted", task_id=task_id)
 
         result = {
@@ -243,12 +243,12 @@ def analyze_video(self, object_key: str, user_id: int):
             "duration_seconds": duration_seconds,
             "analysis": analysis
         }
-        #print(f"[Task {task_id}] Complete | clarity={analysis['clarity_score']} pace={analysis['pace_wpm']}wpm")
+        print(f"[Task {task_id}] Complete | clarity={analysis['clarity_score']} pace={analysis['pace_wpm']}wpm")
         log.info("Task Complete", task_id=task_id, clarity=analysis['clarity_score'], pace=analysis['pace_wpm'])
         return result
 
     except Exception as e:
-        #print(f"[Task {task_id}] Failed at step: {e}")
+        print(f"[Task {task_id}] Failed at step: {e}")
         log.error("Task Failed", task_id=task_id, error=str(e))
         raise
 
@@ -257,13 +257,13 @@ def analyze_video(self, object_key: str, user_id: int):
         for path in [video_path, wav_path]:
             if os.path.exists(path):
                 os.remove(path)
-                #print(f"[Task {task_id}] Cleaned /tmp: {path}")
+                print(f"[Task {task_id}] Cleaned /tmp: {path}")
                 log.info("Task Cleaned /tmp", task_id=task_id, path=path)
 
         # ── Always: delete S3 object unless already done ─────────────
         # Covers: ValueError (silent video), RuntimeError (FFmpeg fail),
         # Whisper failure, LLM failure — every failure path
         if not s3_cleanup_done:
-            #print(f"[Task {task_id}] Cleaning S3 on failure path")
+            print(f"[Task {task_id}] Cleaning S3 on failure path")
             log.info("Task Cleaning S3 on failure path", task_id=task_id)
             delete_from_s3(object_key)

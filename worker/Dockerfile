@@ -11,5 +11,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Worker shares task definitions with backend
 COPY ../backend/tasks ./tasks
 COPY ../backend/services ./services
+COPY ../backend/logger.py ./logger.py
 
 CMD ["celery", "-A", "tasks.celery_app.celery", "worker", "--loglevel=info", "--concurrency=2"]
