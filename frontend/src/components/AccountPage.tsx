@@ -92,7 +92,7 @@ export const AccountPage = ({ onSignOut }: AccountPageProps) => {
 
                     // --- POLLING LOGIC STARTS HERE ---
                     let attempts = 0;
-                    const maxAttempts = 10; // Poll up to 10 times (30 seconds total)
+                    const maxAttempts = 5; // Poll up to 5 times (15 seconds total)
                     let isUpgraded = false;
 
                     while (attempts < maxAttempts) {
@@ -138,7 +138,7 @@ export const AccountPage = ({ onSignOut }: AccountPageProps) => {
             };
 
             const rzp = new (window as any).Razorpay(options);
-
+            console.log("Razorpay instance created:", rzp);
             rzp.on('payment.failed', function (response: any) {
                 setError(`Payment failed: ${response.error.description}`);
             });
@@ -146,6 +146,7 @@ export const AccountPage = ({ onSignOut }: AccountPageProps) => {
             rzp.open();
 
         } catch (err) {
+            console.error("Error during payment initiation:", err);
             setError('Could not initiate payment. Please try again.');
         } finally {
             setUpgrading(false);

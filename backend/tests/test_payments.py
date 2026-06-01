@@ -101,7 +101,7 @@ async def test_create_order_free_user(client):
         )
         assert res.status_code == 200
         assert res.json()["order_id"] == "order_test123"
-        assert res.json()["amount_inr"] == 200
+        assert res.json()["amount_inr_paise"] == 200
 
 # ── Webhook events ─────────────────────────────────────────────────────────
 @pytest.mark.asyncio
@@ -165,7 +165,7 @@ async def test_webhook_unknown_order_id(client):
     )
     # 200 not 400 — we don't want Razorpay to retry forever
     assert res.status_code == 200
-    assert res.json()["status"] == "user_not_found"
+    assert res.json()["status"] == "order_not_found"
 
 # ── Billing status ─────────────────────────────────────────────────────────
 @pytest.mark.asyncio
