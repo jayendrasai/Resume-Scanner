@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { getToken } from '../utils/auth';
+import { v4 as uuidv4 } from 'uuid'; // Import it at the top
 
 const authApi = axios.create({
     baseURL: import.meta.env.DEV ? import.meta.env.VITE_API_URL ?? '' : '',
@@ -59,9 +60,33 @@ export interface PassStatus {
     razorpay_order_id: string | null;
 }
 
+// export const createOrder = async (): Promise<OrderResponse> => {
+//     const res = await authApi.post<OrderResponse>('/v1/billing/create-order');
+//     return res.data;
+// };
+
+
 export const createOrder = async (): Promise<OrderResponse> => {
-    const res = await authApi.post<OrderResponse>('/v1/billing/create-order');
-    return res.data;
+    const storageKey = 'pending_order_idempotency_key';
+    let idempotencyKey = sessionStorage.getItem(storageKey);
+
+    if (!idempotencyKey) {
+        // Use the imported package instead of the native crypto API
+        idempotencyKey = uuidv4();
+        sessionStorage.setItem(storageKey, idempotencyKey);
+    }
+
+    try {
+        const res = await authApi.post<OrderResponse>(
+            '/v1/billing/create-order',
+            {},
+            { headers: { 'X-Idempotency-Key': idempotencyKey } }
+        );
+        sessionStorage.removeItem(storageKey);
+        return res.data;
+    } catch (err) {
+        throw err;
+    }
 };
 
 export const getBillingStatus = async (): Promise<PassStatus> => {
