@@ -14,3 +14,16 @@ class User(Base):
     # Razorpay 30-Day Pass Columns
     razorpay_customer_id = Column(String, nullable=True)
     razorpay_order_id    = Column(String, unique=True, nullable=True, index=True)
+
+
+
+class GuestScan(Base):
+    __tablename__ = "guest_scans"
+
+    id = Column(Integer, primary_key=True, index=True)
+    guest_id = Column(String, index=True, nullable=False)
+    ip = Column(String, index=True, nullable=False)
+    filename = Column(String, nullable=True)
+    
+    # Automatically timestamp when the record is created
+    scanned_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)

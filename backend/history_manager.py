@@ -1,116 +1,79 @@
-import json
 import os
-import fcntl
-from datetime import datetime, timedelta
-from typing import Any
+from datetime import datetime, timezone, timedelta
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
-HISTORY_FILE = "data/history.json"
-WINDOW_HOURS = 3
-
-
-def get_history() -> list[dict[str, Any]]:
-    """Reads history safely using a shared lock."""
-    if not os.path.exists(HISTORY_FILE):
-        return []
-        
-    try:
-        with open(HISTORY_FILE, "r") as f:
-            # Acquire a shared lock (multiple workers can read at once)
-            fcntl.flock(f, fcntl.LOCK_SH)
-            try:
-                data = json.load(f)
-                # Runtime check: Safely handle if json.load returns None or a dict
-                if isinstance(data, list):
-                    return data
-            except json.JSONDecodeError:
-                pass
-            finally:
-                # Always release!
-                fcntl.flock(f, fcntl.LOCK_UN)
-    except Exception:
-        pass
-        
-    return []
-
-def write_history(data: list[dict[str, Any]]) -> None:
-    os.makedirs(os.path.dirname(HISTORY_FILE), exist_ok=True)
-    with open(HISTORY_FILE, "w") as f:
-        fcntl.flock(f, fcntl.LOCK_EX)
-        try:
-            json.dump(data, f, indent=4)
-        finally:
-            fcntl.flock(f, fcntl.LOCK_UN)
-
-def log_activity(guest_id: str, ip_address: str, filename: str) -> None:
-    history = get_history()
-    
-    # Prune records older than 24 hours to prevent file bloat
-    day_ago = datetime.now() - timedelta(days=1)
-    history = [e for e in history if datetime.fromisoformat(e['timestamp']) > day_ago]
-
-    new_entry = {
-        "guest_id": guest_id,
-        "ip": ip_address,
-        "filename": filename,
-        "timestamp": datetime.now().isoformat()
-    }
-    history.append(new_entry)
-    
-    # Safely write the updated array back to disk
-    write_history(history)
+SCAN_LIMIT = 3
+WINDOW_HOURS = 2
 
 
-# def log_activity(guest_id: str, ip: str, filename: str):
-#     history = get_history()
-
-#     # keep only last 24 hours
-#     day_ago = datetime.now() - timedelta(days=1)
-#     history = [
-#         e for e in history
-#         if datetime.fromisoformat(e["timestamp"]) > day_ago
-#     ]
-
-#     new_entry = {
-#         "guest_id": guest_id,
-#         "ip": ip,
-#         "filename": filename,
-#         "timestamp": datetime.now().isoformat()
-#     }
-
-#     history.append(new_entry)
-
-#     with open(HISTORY_FILE, "w") as f:
-#         json.dump(history, f, indent=4)
-
-
-def get_user_scan_count(guest_id: str, ip_address: str) -> int:
-    history = get_history() # Type checker now knows this is list[dict[str, Any]]
-    now = datetime.now()
-    cutoff_time = now - timedelta(hours=WINDOW_HOURS)
-    
-    count = sum(
-        1 for entry in history
-        if (entry.get('guest_id') == guest_id or entry.get('ip') == ip_address)
-        and datetime.fromisoformat(entry['timestamp']) > cutoff_time
+async def log_activity(
+    db: AsyncSession,
+    guest_id: str,
+    ip: str,
+    filename: str
+) -> None:
+    """
+    Inserts a scan record and prunes records older than 24 hours.
+    Replaces fcntl flat-file write — PostgreSQL handles concurrency natively.
+    """
+    await db.execute(
+        text("""
+            INSERT INTO guest_scans (guest_id, ip, filename, scanned_at)
+            VALUES (:guest_id, :ip, :filename, CURRENT_TIMESTAMP)
+        """),
+        {"guest_id": guest_id, "ip": ip, "filename": filename}
     )
-    return count
+    # Prune records older than 24h — keeps table lean
+    await db.execute(
+        text("DELETE FROM guest_scans WHERE scanned_at < datetime('now', '-24 hours')")
+    )
+    await db.commit()
 
 
+async def get_user_scan_count(
+    db: AsyncSession,
+    guest_id: str,
+    ip: str
+) -> int:
+    """
+    Counts scans by guest_id OR ip within the sliding window.
+    """
+    # Calculate the exact cutoff time in Python
+    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=WINDOW_HOURS)
+    
+    result = await db.execute(
+        text("""
+            SELECT COUNT(*) FROM guest_scans 
+            WHERE (guest_id = :guest_id OR ip = :ip)
+            AND scanned_at > :cutoff_time
+        """),
+        {"guest_id": guest_id, "ip": ip, "cutoff_time": cutoff_time}
+    )
+    return result.scalar() or 0
 
-#  def get_user_scan_count(guest_id: str, ip: str) -> int:
-#     history = get_history()
-#     now = datetime.now()
-#     cutoff_time = now - timedelta(hours=WINDOW_HOURS)
 
-#     valid_entries = []
-#     for entry in history:
-#         timestamp_str = entry.get("timestamp")
-#         if not timestamp_str:
-#             continue
-            
-#         entry_time = datetime.fromisoformat(timestamp_str)
-#         if entry_time > cutoff_time:
-#             if entry.get("guest_id") == guest_id or entry.get("ip") == ip:
-#                 valid_entries.append(entry)
-
-#     return len(valid_entries)
+async def get_history(
+    db: AsyncSession,
+    guest_id: str
+) -> list:
+    """Returns scan history for a specific guest_id."""
+    result = await db.execute(
+        text("""
+            SELECT filename, scanned_at, ip
+            FROM guest_scans
+            WHERE guest_id = :guest_id
+            ORDER BY scanned_at DESC
+            LIMIT 50
+        """),
+        {"guest_id": guest_id}
+    )
+    rows = result.fetchall()
+    return [
+        {
+            "filename": row.filename,
+            "timestamp": row.scanned_at.isoformat(),
+            "ip": row.ip
+        }
+        for row in rows
+    ]

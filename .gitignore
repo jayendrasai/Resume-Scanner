@@ -58,6 +58,7 @@ dist-ssr/
 build/
 .vite/
 *.tsbuildinfo
+nginx.prod.conf
 
 # =========================
 # Editor / IDE
@@ -99,6 +100,9 @@ data/
 # =========================
 *.tar
 docker-compose.override.yml
+docker-compose.prod.yml
+Dockerfile.prod
+
 
 # =========================
 # OS Files

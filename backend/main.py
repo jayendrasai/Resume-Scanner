@@ -24,6 +24,9 @@ from jobs_router import router as jobs_router
 from services.ai import analyze_resume_with_ai, analyze_transcript_with_ai , sanitize_llm_input,MAX_JD_LENGTH,MAX_RESUME_LENGTH
 from payments.router import router as payments_router
 from logger import log
+from database import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
+from history_manager import get_user_scan_count, log_activity, get_history
 
 
 
@@ -107,7 +110,10 @@ async def analyze_resume(
     file: UploadFile = File(...), 
     job_description: str = Form(...),
     #guest_id: str = Depends(verify_guest_id)
+    db: AsyncSession = Depends(get_db)
 ):
+    
+    SCAN_LIMIT = 3
     # --------for docker --------
     guest_id = request.headers.get("X-Guest-ID")
     ip = get_real_ip(request)
@@ -116,16 +122,17 @@ async def analyze_resume(
     #guest_id = request.headers.get("X-Guest-ID")
     #ip = request.client.host
 
-    count = get_user_scan_count(guest_id, ip)
+    count = await get_user_scan_count(db, guest_id, ip)
     log.info("User Scan Count", guest_id=guest_id, ip=ip, count=count)
-    if count >= 3:
-        log.error("Limit reached. Try again after 3 hours.")
+
+    if count >= SCAN_LIMIT:
+        log.error("Limit reached. Try again after 2 hours.")
         raise HTTPException(
             status_code=429,
-            detail="Limit reached. Try again after 3 hours."
+            detail="Limit reached. Try again after 2 hours."
         )
 
-    log_activity(guest_id, ip, file.filename)
+    await log_activity(db, guest_id, ip, file.filename)
 
     pdf_content = await validate_pdf_magic_bytes(file)
 
@@ -192,13 +199,13 @@ async def premium_test(user=Depends(require_premium)):
     return {"ok": True}
 
 @app.get("/v1/history")
-async def get_my_history(request: Request):
+async def get_my_history(request: Request,db:AsyncSession = Depends(get_db)):
     guest_id = request.headers.get("X-Guest-ID")
-
-    all_history = get_history()
-    # Filter only for THIS user
-    user_history = [h for h in all_history if h['guest_id'] == guest_id]
-    return user_history
+    if not guest_id:
+        log.error("Guest ID not found")
+        raise HTTPException(status_code=400, detail="Guest ID not found")
+    history = await get_history(db, guest_id)
+    return history
 
 @app.get("/healthz")
 def health():

@@ -1,22 +1,61 @@
 version: '3.8'
 
 services:
-  backend:
-    build: ./backend
-    container_name: scanner_backend
-    expose:
-      - "8000" # Expose to internal docker network, not to host machine directly
-    env_file:
-      - ./backend/.env
-    volumes:
-      - ./backend/data:/app/data # Persist your history.json here
+  # 1. Nginx (Serves React static files & proxies API traffic)
+  nginx:
+    image: jayendrasaichenna/scanner-frontend:v2.0.0
+    container_name: scanner_nginx_prod
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 
-  frontend:
-    build: ./frontend
-    container_name: scanner_frontend
-    ports:
-      - "80:80" # Map host port 80 to container port 80
+  # 2. FastAPI Web Server
+  backend:
+    image: jayendrasaichenna/scanner-backend:v2.0.0
+    container_name: scanner_backend_prod
+    expose:
+      - "8000" # Exposes to internal Docker network only, Nginx routes here
+    env_file:
+      - .env.prod
     depends_on:
-      - backend # Ensure backend starts first
+      redis:
+        condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/healthz" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 3. Celery Background Worker
+  worker:
+    image: jayendrasaichenna/scanner-worker:v2.0.0
+    container_name: scanner_worker_prod
+    env_file:
+      - .env.prod
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # 4. Message Broker (Redis)
+  redis:
+    image: redis:7-alpine
+    container_name: scanner_redis_prod
+    expose:
+      - "6379" # Internal network only, no public port mapping
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+volumes:
+  redis_data:
