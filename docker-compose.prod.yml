@@ -3,10 +3,13 @@ version: '3.8'
 services:
   # 1. Nginx (Serves React static files & proxies API traffic)
   nginx:
-    image: jayendrasaichenna/scanner-frontend:v2.0.0
+    image: jayendrasaichenna/scanner-frontend:v2.1.0
     container_name: scanner_nginx_prod
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro # mount certs read-only
     depends_on:
       backend:
         condition: service_healthy

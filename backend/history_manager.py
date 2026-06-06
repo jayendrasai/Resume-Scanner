@@ -2,6 +2,10 @@ import os
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import delete
+
+# import models from database.models
+from auth.models import GuestScan
 
 SCAN_LIMIT = 3
 WINDOW_HOURS = 2
@@ -26,7 +30,9 @@ async def log_activity(
     )
     # Prune records older than 24h — keeps table lean
     await db.execute(
-        text("DELETE FROM guest_scans WHERE scanned_at < datetime('now', '-24 hours')")
+        delete(GuestScan).where(
+            GuestScan.scanned_at < datetime.utcnow() - timedelta(hours=24)
+        )
     )
     await db.commit()
 
