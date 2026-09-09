@@ -70,7 +70,7 @@ app.include_router(payments_router, prefix="/v1")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://172.18.0.6:5173").split(",")
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "https://resume-scanner-frontend-five.vercel.app").split(",")
 
 app.add_middleware(
     CORSMiddleware,

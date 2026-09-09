@@ -63,7 +63,16 @@ const ResumeScanner: React.FC = () => {
             //const response = await api.post<AnalysisData>("/api/analyze", formData);
 
             // Axios Integration
-            const response = await api.post<AnalysisData>("/v1/analyze", formData);
+            //const response = await api.post<AnalysisData>("/v1/analyze", formData);
+            const response = await api.post(
+                "/v1/analyze",
+                formData,
+                {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                    },
+                }
+            );
             setResult(response.data);
             setStatus("done");
 

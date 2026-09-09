@@ -15,7 +15,7 @@ const BASE = import.meta.env.VITE_API_URL || '';
 const api = axios.create({
     baseURL: BASE,
     headers: {
-        'Content-Type': 'multipart/form-data',
+        //  'Content-Type': 'multipart/form-data',
         'X-Guest-ID': getGuestId(),
     },
 });
