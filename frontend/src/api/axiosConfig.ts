@@ -9,7 +9,7 @@ import { getGuestId } from '../utils/auth';
 //     ? import.meta.env.VITE_API_URL
 //     : '';
 
-const BASE = import.meta.env.VITE_API_URL || 'https://resume-scanner-backend-jnen.onrender.com';
+const BASE = import.meta.env.VITE_API_URL || '';
 
 // console.log("BASE: ", BASE);
 const api = axios.create({
