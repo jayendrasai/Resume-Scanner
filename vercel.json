@@ -2,7 +2,7 @@
     "rewrites": [
         {
             "source": "/v1/(.*)",
-            "destination": "https://resume-scanner-backend-ten.vercel.app"
+            "destination": "https://resume-scanner-backend-jnen.onrender.com/v1/$1"
         },
         {
             "source": "/(.*)",
