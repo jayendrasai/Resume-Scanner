@@ -2,8 +2,12 @@ import axios from 'axios';
 import { getToken } from '../utils/auth';
 import { v4 as uuidv4 } from 'uuid'; // Import it at the top
 
+// const authApi = axios.create({
+//     baseURL: import.meta.env.DEV ? import.meta.env.VITE_API_URL ?? '' : '',
+// });
+
 const authApi = axios.create({
-    baseURL: import.meta.env.DEV ? import.meta.env.VITE_API_URL ?? '' : '',
+    baseURL: import.meta.env.VITE_API_URL || 'https://resume-scanner-backend-jnen.onrender.com',
 });
 
 authApi.interceptors.request.use((config) => {
