@@ -1,26 +1,12 @@
 {
-    "version": 2,
-    "builds": [
+    "rewrites": [
         {
-            "src": "frontend/package.json",
-            "use": "@vercel/static-build",
-            "config": {
-                "distDir": "dist"
-            }
+            "source": "/v1/(.*)",
+            "destination": "https://resume-scanner-backend-ten.vercel.app"
         },
         {
-            "src": "backend/main.py",
-            "use": "@vercel/python"
-        }
-    ],
-    "routes": [
-        {
-            "src": "/v1/(.*)",
-            "dest": "backend/main.py"
-        },
-        {
-            "src": "/(.*)",
-            "dest": "/frontend/dist/$1"
+            "source": "/(.*)",
+            "destination": "/index.html"
         }
     ]
 }
