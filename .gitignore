@@ -108,3 +108,5 @@ Dockerfile.prod
 # OS Files
 # =========================
 Thumbs.db
+Resume_logs
+.agent
