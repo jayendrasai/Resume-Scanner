@@ -7,7 +7,7 @@ import { getGuestId } from '../utils/auth';
 
 const BASE = import.meta.env.DEV
     ? import.meta.env.VITE_API_URL
-    : "";
+    : "https://resume-scanner-backend-jnen.onrender.com";
 // console.log("BASE: ", BASE);
 const api = axios.create({
     baseURL: BASE,
